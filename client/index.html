@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image DeMosaique - Bayer CFA Simulator</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="7" height="7" fill="rgba(255,0,0,0.3)"/>
+                            <rect x="10" y="3" width="7" height="7" fill="rgba(0,255,0,0.3)"/>
+                            <rect x="3" y="10" width="7" height="7" fill="rgba(0,255,0,0.3)"/>
+                            <rect x="10" y="10" width="7" height="7" fill="rgba(0,0,255,0.3)"/>
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                        </svg>
+                    </div>
+                    <div class="logo-text">
+                        <span class="logo-title">Image DeMosaique</span>
+                        <span class="logo-subtitle">BAYER CFA SIMULATOR</span>
+                    </div>
+                </div>
+                <button id="reset-button" class="reset-button">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                        <path d="M3 3v5h5"/>
+                    </svg>
+                    RESET
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main">
+            <!-- Error Banner -->
+            <div id="error-banner" class="error-banner hidden">
+                <span class="error-icon">!</span>
+                <span id="error-message"></span>
+            </div>
+
+            <!-- Upload Container (shown when no image) -->
+            <div id="upload-container" class="upload-container">
+                <!-- Uploader -->
+                <div class="uploader-container">
+                    <div class="uploader-header">
+                        <span class="header-line"></span>
+                        <span class="header-label">INPUT IMAGE</span>
+                        <span class="header-line"></span>
+                    </div>
+
+                    <div id="dropzone" class="dropzone">
+                        <div class="grid-pattern"></div>
+                        <div class="corner top-left"></div>
+                        <div class="corner top-right"></div>
+                        <div class="corner bottom-left"></div>
+                        <div class="corner bottom-right"></div>
+
+                        <input type="file" id="file-input" class="file-input" accept="image/png,image/jpeg,image/jpg,.mosaic,.mosai2">
+
+                        <div id="dropzone-content" class="dropzone-content">
+                            <div class="icon-container">
+                                <div class="crosshair">
+                                    <span></span><span></span><span></span><span></span>
+                                </div>
+                                <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="17 8 12 3 7 8"/>
+                                    <line x1="12" y1="3" x2="12" y2="15"/>
+                                </svg>
+                            </div>
+                            <div class="text-container">
+                                <span class="main-text">DROP IMAGE HERE</span>
+                                <span class="sub-text">or click to browse</span>
+                            </div>
+                            <div class="format-badges">
+                                <span class="badge">PNG</span>
+                                <span class="badge">JPEG</span>
+                                <span class="badge">.MOSAIC</span>
+                                <span class="badge">.MOSAI2</span>
+                            </div>
+                        </div>
+
+                        <div id="processing-state" class="dropzone-content hidden">
+                            <div class="spinner"></div>
+                            <span class="processing-text">PROCESSING...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info Steps -->
+                <div class="info">
+                    <span class="info-title">HOW IT WORKS</span>
+                    <div class="info-steps">
+                        <div class="info-step">
+                            <span class="step-number">01</span>
+                            <span class="step-text">Upload any PNG or JPEG image</span>
+                        </div>
+                        <div class="info-step">
+                            <span class="step-number">02</span>
+                            <span class="step-text">View the RGGB Bayer mosaic pattern applied</span>
+                        </div>
+                        <div class="info-step">
+                            <span class="step-number">03</span>
+                            <span class="step-text">Compare demosaicing algorithms in real-time</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workspace (shown when image loaded) -->
+            <div id="workspace" class="workspace hidden">
+                <!-- Image Panels -->
+                <div class="panels-section">
+                    <div class="panels-container">
+                        <div class="panels-header">
+                            <span class="header-line"></span>
+                            <span class="header-label">COMPARISON VIEW</span>
+                            <span class="header-line"></span>
+                        </div>
+
+                        <div class="panels-grid">
+                            <!-- Original Panel -->
+                            <div id="original-panel" class="panel">
+                                <div class="panel-header">
+                                    <div class="label-group">
+                                        <span class="panel-index">01</span>
+                                        <span class="panel-label">ORIGINAL</span>
+                                    </div>
+                                    <div class="panel-actions">
+                                        <span class="panel-sublabel">RGB</span>
+                                        <button class="expand-btn" data-panel="original" title="Expand view">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="image-container" data-panel="original">
+                                    <img id="original-image" class="panel-image" alt="Original">
+                                    <div class="image-overlay">
+                                        <div class="corner-marker top-left" style="top:8px;left:8px;"></div>
+                                        <div class="corner-marker top-right" style="top:8px;right:8px;"></div>
+                                        <div class="corner-marker bottom-left" style="bottom:8px;left:8px;"></div>
+                                        <div class="corner-marker bottom-right" style="bottom:8px;right:8px;"></div>
+                                    </div>
+                                    <div class="inspector-crosshair hidden">
+                                        <div class="crosshair-h"></div>
+                                        <div class="crosshair-v"></div>
+                                        <div class="crosshair-coords"></div>
+                                    </div>
+                                </div>
+                                <div class="panel-info-bar">
+                                    <div class="info-readout">
+                                        <span class="readout-label">RES</span>
+                                        <span id="original-resolution" class="readout-value">--</span>
+                                    </div>
+                                    <div class="info-divider"></div>
+                                    <div class="info-readout">
+                                        <span class="readout-label">SIZE</span>
+                                        <span id="original-size" class="readout-value">--</span>
+                                    </div>
+                                    <div class="info-divider"></div>
+                                    <div class="info-readout">
+                                        <span class="readout-label">CH</span>
+                                        <span class="readout-value readout-highlight">3</span>
+                                    </div>
+                                </div>
+                                <div class="status-bar">
+                                    <div id="original-status" class="status-dot"></div>
+                                    <span class="status-text">SOURCE</span>
+                                </div>
+                            </div>
+
+                            <!-- Mosaic Panel -->
+                            <div id="mosaic-panel" class="panel">
+                                <div class="panel-header">
+                                    <div class="label-group">
+                                        <span class="panel-index">02</span>
+                                        <span class="panel-label">MOSAICED</span>
+                                    </div>
+                                    <div class="panel-actions">
+                                        <span id="mosaic-sublabel" class="panel-sublabel">GRAYSCALE</span>
+                                        <button class="expand-btn" data-panel="mosaic" title="Expand view">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="image-container" data-panel="mosaic">
+                                    <img id="mosaic-image" class="panel-image" alt="Mosaiced">
+                                    <div class="image-overlay">
+                                        <div class="corner-marker top-left" style="top:8px;left:8px;"></div>
+                                        <div class="corner-marker top-right" style="top:8px;right:8px;"></div>
+                                        <div class="corner-marker bottom-left" style="bottom:8px;left:8px;"></div>
+                                        <div class="corner-marker bottom-right" style="bottom:8px;right:8px;"></div>
+                                    </div>
+                                    <div class="inspector-crosshair hidden">
+                                        <div class="crosshair-h"></div>
+                                        <div class="crosshair-v"></div>
+                                        <div class="crosshair-coords"></div>
+                                    </div>
+                                </div>
+                                <div class="panel-info-bar">
+                                    <div class="info-readout">
+                                        <span class="readout-label">RES</span>
+                                        <span id="mosaic-resolution" class="readout-value">--</span>
+                                    </div>
+                                    <div class="info-divider"></div>
+                                    <div class="info-readout">
+                                        <span class="readout-label">SIZE</span>
+                                        <span id="mosaic-size" class="readout-value">--</span>
+                                    </div>
+                                    <div class="info-divider"></div>
+                                    <div class="info-readout">
+                                        <span class="readout-label">CH</span>
+                                        <span class="readout-value readout-cyan">1</span>
+                                    </div>
+                                </div>
+                                <div class="status-bar">
+                                    <div id="mosaic-status" class="status-dot"></div>
+                                    <span class="status-text">CFA OUTPUT</span>
+                                </div>
+                            </div>
+
+                            <!-- Reconstructed Panel -->
+                            <div id="reconstructed-panel" class="panel">
+                                <div class="panel-header">
+                                    <div class="label-group">
+                                        <span class="panel-index">03</span>
+                                        <span class="panel-label">RECONSTRUCTED</span>
+                                    </div>
+                                    <div class="panel-actions">
+                                        <span id="reconstructed-sublabel" class="panel-sublabel">FAD</span>
+                                        <button class="expand-btn" data-panel="reconstructed" title="Expand view">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="image-container" data-panel="reconstructed">
+                                    <img id="reconstructed-image" class="panel-image" alt="Reconstructed">
+                                    <div class="image-overlay">
+                                        <div class="corner-marker top-left" style="top:8px;left:8px;"></div>
+                                        <div class="corner-marker top-right" style="top:8px;right:8px;"></div>
+                                        <div class="corner-marker bottom-left" style="bottom:8px;left:8px;"></div>
+                                        <div class="corner-marker bottom-right" style="bottom:8px;right:8px;"></div>
+                                    </div>
+                                    <div class="inspector-crosshair hidden">
+                                        <div class="crosshair-h"></div>
+                                        <div class="crosshair-v"></div>
+                                        <div class="crosshair-coords"></div>
+                                    </div>
+                                </div>
+                                <div class="panel-info-bar">
+                                    <div class="info-readout">
+                                        <span class="readout-label">RES</span>
+                                        <span id="reconstructed-resolution" class="readout-value">--</span>
+                                    </div>
+                                    <div class="info-divider"></div>
+                                    <div class="info-readout">
+                                        <span class="readout-label">SIZE</span>
+                                        <span id="reconstructed-size" class="readout-value">--</span>
+                                    </div>
+                                    <div class="info-divider"></div>
+                                    <div class="info-readout">
+                                        <span class="readout-label">CH</span>
+                                        <span class="readout-value readout-highlight">3</span>
+                                    </div>
+                                </div>
+                                <div class="status-bar">
+                                    <div id="reconstructed-status" class="status-dot"></div>
+                                    <span class="status-text">DEMOSAICED</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sidebar Controls -->
+                <div class="sidebar">
+                    <!-- Algorithm Toggle -->
+                    <div class="algorithm-container">
+                        <div class="algorithm-header">
+                            <span class="section-label">DEMOSAIC ALGORITHM</span>
+                        </div>
+                        <div class="algorithm-options">
+                            <button class="algorithm-option" data-algorithm="nearest_neighbor" disabled>
+                                <span class="option-index">01</span>
+                                <span class="option-label">Nearest Neighbor</span>
+                                <span class="option-short">NN</span>
+                                <div class="active-indicator" style="display:none;"><div class="active-dot"></div></div>
+                            </button>
+                            <button class="algorithm-option" data-algorithm="bilinear" disabled>
+                                <span class="option-index">02</span>
+                                <span class="option-label">Bilinear</span>
+                                <span class="option-short">BL</span>
+                                <div class="active-indicator" style="display:none;"><div class="active-dot"></div></div>
+                            </button>
+                            <button class="algorithm-option" data-algorithm="malvar_he_cutler" disabled>
+                                <span class="option-index">03</span>
+                                <span class="option-label">Malvar-He-Cutler</span>
+                                <span class="option-short">MHC</span>
+                                <div class="active-indicator" style="display:none;"><div class="active-dot"></div></div>
+                            </button>
+                            <div class="algorithm-divider">
+                                <span class="divider-label">ADVANCED</span>
+                            </div>
+                            <button class="algorithm-option" data-algorithm="agcrd" disabled>
+                                <span class="option-index">04</span>
+                                <span class="option-label">AGCRD</span>
+                                <span class="option-short">AGC</span>
+                                <div class="active-indicator" style="display:none;"><div class="active-dot"></div></div>
+                            </button>
+                            <button class="algorithm-option active" data-algorithm="frequency_aware" disabled>
+                                <span class="option-index">05</span>
+                                <span class="option-label">Frequency-Aware</span>
+                                <span class="option-short">FAD</span>
+                                <div class="active-indicator" style="display:flex;"><div class="active-dot"></div></div>
+                            </button>
+                            <button class="algorithm-option" data-algorithm="bilinear_corrected" disabled>
+                                <span class="option-index">06</span>
+                                <span class="option-label">Bilinear Corrected</span>
+                                <span class="option-short">BLC</span>
+                                <div class="active-indicator" style="display:none;"><div class="active-dot"></div></div>
+                            </button>
+                            <button class="algorithm-option" data-algorithm="smooth_hue" disabled>
+                                <span class="option-index">07</span>
+                                <span class="option-label">Smooth Hue</span>
+                                <span class="option-short">SHT</span>
+                                <div class="active-indicator" style="display:none;"><div class="active-dot"></div></div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Mosaic View Toggle -->
+                    <div class="view-toggle-container">
+                        <div class="view-toggle-header">
+                            <span class="section-label">MOSAIC VISUALIZATION</span>
+                        </div>
+                        <div class="toggle-wrapper">
+                            <button class="toggle-button active" data-view="grayscale" disabled>
+                                <svg class="toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                    <line x1="3" y1="12" x2="21" y2="12"/>
+                                    <line x1="12" y1="3" x2="12" y2="21"/>
+                                </svg>
+                                Grayscale
+                            </button>
+                            <div class="toggle-divider"></div>
+                            <button class="toggle-button" data-view="colorized" disabled>
+                                <svg class="toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="9"/>
+                                    <path d="M12 3v18"/>
+                                    <path d="M12 12L3.5 7.5"/>
+                                    <path d="M12 12l8.5-4.5"/>
+                                </svg>
+                                Color-coded
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Mosaic Mode Toggle (Standard vs Compact) -->
+                    <div class="mode-toggle-container">
+                        <div class="mode-toggle-header">
+                            <span class="section-label">MOSAIC MODE</span>
+                            <span id="storage-ratio" class="storage-badge">100%</span>
+                        </div>
+                        <div class="toggle-wrapper">
+                            <button class="toggle-button active" data-mode="standard" disabled>
+                                <svg class="toggle-icon" viewBox="0 0 24 24">
+                                    <rect x="3" y="3" width="8" height="8" fill="#ff4444" opacity="0.8"/>
+                                    <rect x="13" y="3" width="8" height="8" fill="#44ff44" opacity="0.8"/>
+                                    <rect x="3" y="13" width="8" height="8" fill="#44ff44" opacity="0.8"/>
+                                    <rect x="13" y="13" width="8" height="8" fill="#4444ff" opacity="0.8"/>
+                                </svg>
+                                Standard RGGB
+                            </button>
+                            <div class="toggle-divider"></div>
+                            <button class="toggle-button" data-mode="compact" disabled>
+                                <svg class="toggle-icon" viewBox="0 0 24 24">
+                                    <rect x="3" y="3" width="8" height="8" fill="#ff4444" opacity="0.8"/>
+                                    <rect x="13" y="3" width="8" height="8" fill="#44ff44" opacity="0.8"/>
+                                    <rect x="13" y="13" width="8" height="8" fill="#4444ff" opacity="0.8"/>
+                                    <rect x="3" y="13" width="8" height="8" fill="none" stroke="#555" stroke-width="1" stroke-dasharray="2,2"/>
+                                </svg>
+                                Compact RG-B
+                            </button>
+                        </div>
+                        <div class="mode-hint">
+                            <span id="mode-description">Full RGGB Bayer pattern with two green channels</span>
+                        </div>
+                    </div>
+
+                    <!-- Export Controls -->
+                    <div class="export-container">
+                        <div class="export-header">
+                            <span id="export-label" class="section-label">EXPORT MOSAIC</span>
+                        </div>
+                        <div class="export-controls">
+                            <div class="format-row">
+                                <span class="row-label">Format</span>
+                                <div class="format-buttons">
+                                    <button class="format-btn" data-format="mosaic" disabled>
+                                        <span class="format-ext">.MOSAIC</span>
+                                        <span class="format-desc">1-Channel</span>
+                                    </button>
+                                    <button class="format-btn" data-format="mosai2" disabled>
+                                        <span class="format-ext">.MOSAI2</span>
+                                        <span class="format-desc">Dual-JPEG</span>
+                                    </button>
+                                    <button class="format-btn active" data-format="png" disabled>
+                                        <span class="format-ext">.PNG</span>
+                                        <span class="format-desc">Lossless</span>
+                                    </button>
+                                    <button class="format-btn" data-format="jpeg" disabled>
+                                        <span class="format-ext">.JPEG</span>
+                                        <span class="format-desc">RGB</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="quality-row" id="quality-row">
+                                <div class="quality-header">
+                                    <span id="quality-label" class="row-label">Compression Quality</span>
+                                    <span id="quality-value" class="quality-value">85%</span>
+                                </div>
+                                <div class="slider-container">
+                                    <div class="slider-track">
+                                        <div id="slider-fill" class="slider-fill" style="width: 85%;"></div>
+                                    </div>
+                                    <input type="range" id="quality-slider" class="slider" min="1" max="100" value="85" disabled>
+                                    <div class="slider-marks">
+                                        <span>1</span>
+                                        <span>50</span>
+                                        <span>100</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="compression-row" id="compression-row">
+                                <span class="row-label">Base Compression</span>
+                                <div class="compression-toggle">
+                                    <button class="compression-btn active" data-compression="jpeg" disabled>JPEG</button>
+                                    <button class="compression-btn" data-compression="webp" disabled>WebP</button>
+                                </div>
+                                <span id="compression-info" class="compression-info">Adaptive: auto-selects smallest</span>
+                            </div>
+                            <div class="estimate-row" id="estimate-row">
+                                <span class="row-label">Estimated Size</span>
+                                <div class="estimate-display">
+                                    <span id="estimate-size" class="estimate-size">--</span>
+                                    <span id="estimate-format" class="estimate-format"></span>
+                                </div>
+                            </div>
+                            <button id="export-button" class="export-button" disabled>
+                                <svg class="export-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="7 10 12 15 17 10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                DOWNLOAD
+                                <span id="export-ext" class="export-ext">.PNG</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Quality Metrics -->
+                    <div class="metrics-container">
+                        <button id="metrics-header" class="metrics-header">
+                            <div class="header-left">
+                                <svg id="metrics-chevron" class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="9 18 15 12 9 6"/>
+                                </svg>
+                                <span class="metrics-label">QUALITY METRICS</span>
+                            </div>
+                            <div class="summary-badges">
+                                <span id="psnr-badge" class="summary-badge" style="color: var(--phosphor);">--</span>
+                                <span id="ssim-badge" class="summary-badge" style="color: var(--cyan);">--</span>
+                            </div>
+                        </button>
+                        <div id="metrics-content" class="metrics-content hidden">
+                            <!-- PSNR Card -->
+                            <div class="metric-card">
+                                <div class="metric-header">
+                                    <span class="metric-name">PSNR</span>
+                                    <span class="metric-unit">Peak Signal-to-Noise Ratio</span>
+                                </div>
+                                <div class="metric-body">
+                                    <div class="metric-value">
+                                        <span id="psnr-value" class="value-number">--</span>
+                                        <span class="value-unit">dB</span>
+                                    </div>
+                                    <div class="metric-quality">
+                                        <span id="psnr-quality" class="quality-badge">--</span>
+                                    </div>
+                                    <div class="metric-scale">
+                                        <div class="scale-bar">
+                                            <div id="psnr-fill" class="scale-fill psnr" style="width: 0%;"></div>
+                                            <div id="psnr-marker" class="scale-marker" style="left: 0%;"></div>
+                                        </div>
+                                        <div class="scale-labels">
+                                            <span>0</span>
+                                            <span>30</span>
+                                            <span>60 dB</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- SSIM Card -->
+                            <div class="metric-card">
+                                <div class="metric-header">
+                                    <span class="metric-name">SSIM</span>
+                                    <span class="metric-unit">Structural Similarity Index</span>
+                                </div>
+                                <div class="metric-body">
+                                    <div class="metric-value">
+                                        <span id="ssim-value" class="value-number">--</span>
+                                        <span class="value-unit"></span>
+                                    </div>
+                                    <div class="metric-quality">
+                                        <span id="ssim-quality" class="quality-badge">--</span>
+                                    </div>
+                                    <div class="metric-scale">
+                                        <div class="scale-bar">
+                                            <div id="ssim-fill" class="scale-fill ssim" style="width: 0%;"></div>
+                                            <div id="ssim-marker" class="scale-marker" style="left: 0%;"></div>
+                                        </div>
+                                        <div class="scale-labels">
+                                            <span>0</span>
+                                            <span>0.5</span>
+                                            <span>1.0</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pixel Inspector -->
+                    <div class="pixel-inspector">
+                        <div class="inspector-header">
+                            <div class="header-left">
+                                <svg class="inspector-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="11" cy="11" r="8"/>
+                                    <path d="M21 21l-4.35-4.35"/>
+                                    <circle cx="11" cy="11" r="3" stroke-dasharray="2 2"/>
+                                </svg>
+                                <span class="section-label">PIXEL INSPECTOR</span>
+                            </div>
+                            <div class="inspector-coords-display">
+                                <span class="coords-label">XY:</span>
+                                <span id="inspector-xy" class="coords-value">--,--</span>
+                            </div>
+                        </div>
+                        <div class="inspector-hint">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4M12 8h.01"/>
+                            </svg>
+                            <span>Click on any image to inspect pixels</span>
+                        </div>
+                        <div id="inspector-content" class="inspector-content hidden">
+                            <div class="inspector-grid">
+                                <!-- Original pixels -->
+                                <div class="inspector-cell">
+                                    <div class="cell-header">
+                                        <span class="cell-index">01</span>
+                                        <span class="cell-label">ORIGINAL</span>
+                                    </div>
+                                    <canvas id="inspector-original" class="pixel-canvas" width="128" height="128"></canvas>
+                                    <div class="cell-readout">
+                                        <span id="original-pixel-rgb" class="pixel-rgb">R:-- G:-- B:--</span>
+                                    </div>
+                                </div>
+                                <!-- Mosaic pixels -->
+                                <div class="inspector-cell">
+                                    <div class="cell-header">
+                                        <span class="cell-index">02</span>
+                                        <span class="cell-label">MOSAICED</span>
+                                    </div>
+                                    <canvas id="inspector-mosaic" class="pixel-canvas" width="128" height="128"></canvas>
+                                    <div class="cell-readout">
+                                        <span id="mosaic-pixel-val" class="pixel-rgb pixel-cyan">VAL:--</span>
+                                    </div>
+                                </div>
+                                <!-- Reconstructed pixels -->
+                                <div class="inspector-cell">
+                                    <div class="cell-header">
+                                        <span class="cell-index">03</span>
+                                        <span class="cell-label">RECONSTRUCTED</span>
+                                    </div>
+                                    <canvas id="inspector-reconstructed" class="pixel-canvas" width="128" height="128"></canvas>
+                                    <div class="cell-readout">
+                                        <span id="reconstructed-pixel-rgb" class="pixel-rgb">R:-- G:-- B:--</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="inspector-controls">
+                                <div class="zoom-control">
+                                    <span class="zoom-label">ZOOM</span>
+                                    <div class="zoom-buttons">
+                                        <button id="zoom-8" class="zoom-btn active" data-zoom="8">8x</button>
+                                        <button id="zoom-16" class="zoom-btn" data-zoom="16">16x</button>
+                                        <button id="zoom-32" class="zoom-btn" data-zoom="32">32x</button>
+                                    </div>
+                                </div>
+                                <div class="grid-toggle">
+                                    <label class="toggle-label">
+                                        <input type="checkbox" id="show-grid" checked>
+                                        <span class="toggle-text">GRID</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <span class="footer-text">IMAGE DEMOSAIQUE // BAYER CFA SIMULATOR // CLIENT-SIDE PROCESSING</span>
+        </footer>
+    </div>
+
+    <!-- Fullscreen Modal -->
+    <div id="fullscreen-modal" class="fullscreen-modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span id="modal-panel-index" class="panel-index">01</span>
+                    <span id="modal-panel-label" class="panel-label">ORIGINAL</span>
+                    <span id="modal-panel-sublabel" class="panel-sublabel">RGB</span>
+                </div>
+                <div class="modal-info">
+                    <span id="modal-resolution" class="modal-info-text">--</span>
+                    <span class="modal-info-divider">|</span>
+                    <span id="modal-zoom" class="modal-info-text">FIT</span>
+                </div>
+                <button id="modal-close" class="modal-close-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                    <span>ESC</span>
+                </button>
+            </div>
+            <div class="modal-image-wrapper">
+                <div class="modal-image-container">
+                    <img id="modal-image" class="modal-image" alt="Fullscreen view">
+                    <div class="modal-scan-line"></div>
+                </div>
+            </div>
+            <div class="modal-controls">
+                <button id="modal-fit" class="modal-control-btn active" data-zoom="fit">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                        <path d="M9 3v18M15 3v18M3 9h18M3 15h18"/>
+                    </svg>
+                    FIT
+                </button>
+                <button id="modal-100" class="modal-control-btn" data-zoom="100">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M12 3v2M12 19v2M3 12h2M19 12h2"/>
+                    </svg>
+                    100%
+                </button>
+                <button id="modal-200" class="modal-control-btn" data-zoom="200">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="M21 21l-4.35-4.35"/>
+                        <path d="M11 8v6M8 11h6"/>
+                    </svg>
+                    200%
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="js/mosaicing.js"></script>
+    <script src="js/demosaicing.js"></script>
+    <script src="js/demosaicing-advanced.js"></script>
+    <script src="js/metrics.js"></script>
+    <script src="js/mosaic-format.js"></script>
+    <script src="js/mosaic-format2.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

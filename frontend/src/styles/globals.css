@@ -1,0 +1,183 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* Scientific instrument palette */
+  --bg-void: #050508;
+  --bg-primary: #0a0b0f;
+  --bg-panel: #0d0e14;
+  --bg-elevated: #12141c;
+  --bg-control: #181a24;
+
+  --border-dim: #1a1c26;
+  --border-subtle: #252836;
+  --border-active: #3a3f52;
+
+  /* Phosphor green - the signature color */
+  --phosphor: #00ff9d;
+  --phosphor-dim: #00cc7d;
+  --phosphor-glow: rgba(0, 255, 157, 0.15);
+  --phosphor-intense: rgba(0, 255, 157, 0.4);
+
+  /* Cyan accent for secondary elements */
+  --cyan: #00d4ff;
+  --cyan-dim: #00a8cc;
+  --cyan-glow: rgba(0, 212, 255, 0.12);
+
+  /* Warm accent for warnings/highlights */
+  --amber: #ffb800;
+  --amber-dim: #cc9400;
+
+  /* Error state */
+  --error: #ff3d5a;
+  --error-glow: rgba(255, 61, 90, 0.15);
+
+  /* Text hierarchy */
+  --text-bright: #ffffff;
+  --text-primary: #e8eaf0;
+  --text-secondary: #8b8fa8;
+  --text-muted: #545768;
+  --text-dim: #3a3d4a;
+
+  /* Spatial system */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* Typography */
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  --font-display: 'Outfit', -apple-system, sans-serif;
+
+  /* Transitions */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-fast: 120ms var(--ease-out-expo);
+  --transition-normal: 200ms var(--ease-out-expo);
+  --transition-slow: 400ms var(--ease-out-expo);
+}
+
+html, body {
+  font-family: var(--font-display);
+  background-color: var(--bg-void);
+  color: var(--text-primary);
+  min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, var(--phosphor-glow), transparent),
+    linear-gradient(180deg, var(--bg-void) 0%, var(--bg-primary) 100%);
+}
+
+/* Subtle scan line effect */
+#root::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+input, select {
+  font-family: inherit;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-panel);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-active);
+}
+
+/* Selection color */
+::selection {
+  background: var(--phosphor);
+  color: var(--bg-void);
+}
+
+/* Focus visible styles */
+:focus-visible {
+  outline: 2px solid var(--phosphor);
+  outline-offset: 2px;
+}
+
+/* Utility classes */
+.mono {
+  font-family: var(--font-mono);
+}
+
+/* Keyframe animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes scanLine {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 5px var(--phosphor-glow), 0 0 20px var(--phosphor-glow);
+  }
+  50% {
+    box-shadow: 0 0 10px var(--phosphor-intense), 0 0 30px var(--phosphor-glow);
+  }
+}

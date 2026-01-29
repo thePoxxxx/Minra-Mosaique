@@ -1,0 +1,242 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.headerLine {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-subtle), transparent);
+}
+
+.headerLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  color: var(--text-muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 1024px) {
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  animation: slideUp 0.5s var(--ease-out-expo) both;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-dim);
+}
+
+.labelGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.panelIndex {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--phosphor);
+  padding: 2px 6px;
+  background: var(--phosphor-glow);
+  border-radius: var(--radius-xs);
+}
+
+.panelLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--text-primary);
+}
+
+.panelSublabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.imageContainer {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--bg-void);
+  overflow: hidden;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: auto;
+}
+
+.imageOverlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.cornerMarker {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+}
+
+.cornerMarker::before,
+.cornerMarker::after {
+  content: '';
+  position: absolute;
+  background: var(--phosphor);
+  opacity: 0.6;
+}
+
+.cornerMarker::before {
+  width: 12px;
+  height: 1px;
+  top: 0;
+  left: 0;
+}
+
+.cornerMarker::after {
+  width: 1px;
+  height: 12px;
+  top: 0;
+  left: 0;
+}
+
+/* Adjust corners for different positions */
+.cornerMarker:nth-child(2)::before { left: auto; right: 0; }
+.cornerMarker:nth-child(2)::after { left: auto; right: 0; }
+
+.cornerMarker:nth-child(3)::before { top: auto; bottom: 0; }
+.cornerMarker:nth-child(3)::after { top: auto; bottom: 0; }
+
+.cornerMarker:nth-child(4)::before { left: auto; right: 0; top: auto; bottom: 0; }
+.cornerMarker:nth-child(4)::after { left: auto; right: 0; top: auto; bottom: 0; }
+
+.scanLine {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--phosphor-glow),
+    var(--phosphor),
+    var(--phosphor-glow),
+    transparent
+  );
+  opacity: 0;
+  pointer-events: none;
+}
+
+.panel:hover .scanLine {
+  opacity: 1;
+  animation: scanMove 2s linear infinite;
+}
+
+@keyframes scanMove {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(calc(100% * 4 / 3 * 100)); }
+}
+
+.loadingState,
+.emptyState {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.loadingSpinner {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--border-subtle);
+  border-top-color: var(--phosphor);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loadingState span,
+.emptyState span {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  color: var(--text-muted);
+}
+
+.loadingState span {
+  color: var(--phosphor);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.statusBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--bg-control);
+  border-top: 1px solid var(--border-dim);
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: background var(--transition-fast);
+}
+
+.statusDot[data-active="true"] {
+  background: var(--phosphor);
+  box-shadow: 0 0 8px var(--phosphor);
+}
+
+.statusText {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}

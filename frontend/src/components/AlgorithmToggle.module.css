@@ -1,0 +1,119 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-md);
+  padding: 4px;
+}
+
+.option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.option:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  border-color: var(--border-dim);
+}
+
+.option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.option.active {
+  background: var(--phosphor-glow);
+  border-color: var(--phosphor);
+}
+
+.optionIndex {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-dim);
+  min-width: 18px;
+  transition: color var(--transition-fast);
+}
+
+.option.active .optionIndex {
+  color: var(--phosphor);
+}
+
+.optionLabel {
+  flex: 1;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: color var(--transition-fast);
+}
+
+.option:hover:not(:disabled) .optionLabel,
+.option.active .optionLabel {
+  color: var(--text-primary);
+}
+
+.optionShort {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  padding: 2px 6px;
+  background: var(--bg-control);
+  border-radius: var(--radius-xs);
+  transition: all var(--transition-fast);
+}
+
+.option.active .optionShort {
+  background: var(--phosphor);
+  color: var(--bg-void);
+}
+
+.activeIndicator {
+  position: absolute;
+  left: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+}
+
+.activeDot {
+  width: 4px;
+  height: 16px;
+  background: var(--phosphor);
+  border-radius: 2px;
+  box-shadow: 0 0 8px var(--phosphor);
+}
