@@ -1,0 +1,3245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MINRA-MOSAIQUE // CFA Image Processor</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    /* ═══════════════════════════════════════════════════════════════════
+       MINRA-MOSAIQUE - Retro Scientific Instrument Interface
+       Inspired by vintage Tektronix oscilloscopes & NASA mission control
+       ═══════════════════════════════════════════════════════════════════ */
+
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      /* CRT Phosphor Colors */
+      --phosphor: #00ff9d;
+      --phosphor-bright: #4dffb8;
+      --phosphor-dim: #00cc7d;
+      --phosphor-glow: rgba(0, 255, 157, 0.15);
+      --phosphor-intense: rgba(0, 255, 157, 0.5);
+      --phosphor-text: rgba(0, 255, 157, 0.9);
+
+      /* Secondary Phosphors */
+      --amber: #ffb000;
+      --amber-dim: #cc8c00;
+      --amber-glow: rgba(255, 176, 0, 0.15);
+
+      --cyan: #00e5ff;
+      --cyan-dim: #00b8cc;
+      --cyan-glow: rgba(0, 229, 255, 0.12);
+
+      /* Channel Colors */
+      --red-channel: #ff4d4d;
+      --green-channel: #4dff4d;
+      --blue-channel: #4d9fff;
+
+      /* Error/Warning */
+      --error: #ff3d5a;
+      --error-glow: rgba(255, 61, 90, 0.2);
+
+      /* Instrument Surfaces */
+      --case-dark: #0a0a0c;
+      --case-medium: #111114;
+      --panel-bg: #0d0d10;
+      --panel-surface: #131316;
+      --bezel: #1a1a1f;
+      --bezel-highlight: #252530;
+      --screen-bg: #050508;
+      --screen-border: #2a2a35;
+
+      /* Text Hierarchy */
+      --text-bright: #ffffff;
+      --text-primary: #e0e0e8;
+      --text-secondary: #888898;
+      --text-muted: #505060;
+      --text-dim: #303038;
+
+      /* Typography */
+      --font-display: 'Orbitron', 'Segoe UI', sans-serif;
+      --font-mono: 'IBM Plex Mono', 'Consolas', monospace;
+
+      /* Spacing */
+      --gap-xs: 4px;
+      --gap-sm: 8px;
+      --gap-md: 16px;
+      --gap-lg: 24px;
+      --gap-xl: 32px;
+
+      /* Borders */
+      --radius-sm: 2px;
+      --radius-md: 4px;
+      --radius-lg: 8px;
+
+      /* Transitions */
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --transition-fast: 100ms var(--ease-out);
+      --transition-normal: 200ms var(--ease-out);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       BASE & BACKGROUND
+       ═══════════════════════════════════════════════════════════════════ */
+
+    html, body {
+      font-family: var(--font-mono);
+      background: var(--case-dark);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    body {
+      background:
+        /* Subtle vignette */
+        radial-gradient(ellipse 100% 100% at 50% 50%, transparent 0%, rgba(0,0,0,0.4) 100%),
+        /* Top phosphor ambient */
+        radial-gradient(ellipse 80% 30% at 50% 0%, var(--phosphor-glow), transparent),
+        /* Base gradient */
+        linear-gradient(180deg, var(--case-dark) 0%, var(--case-medium) 100%);
+    }
+
+    /* CRT Scan Lines */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent 0px,
+        transparent 2px,
+        rgba(0, 0, 0, 0.08) 2px,
+        rgba(0, 0, 0, 0.08) 4px
+      );
+      pointer-events: none;
+      z-index: 10000;
+    }
+
+    /* Animated scan beam */
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        var(--phosphor-glow) 20%,
+        var(--phosphor-intense) 50%,
+        var(--phosphor-glow) 80%,
+        transparent 100%
+      );
+      animation: scanBeam 8s linear infinite;
+      pointer-events: none;
+      z-index: 10001;
+      opacity: 0.3;
+    }
+
+    @keyframes scanBeam {
+      0% { top: 0; }
+      100% { top: 100vh; }
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: var(--case-dark); }
+    ::-webkit-scrollbar-thumb {
+      background: var(--bezel);
+      border: 1px solid var(--screen-border);
+    }
+    ::-webkit-scrollbar-thumb:hover { background: var(--bezel-highlight); }
+
+    ::selection {
+      background: var(--phosphor);
+      color: var(--case-dark);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       LAYOUT CONTAINER
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .instrument-case {
+      max-width: 1680px;
+      margin: 0 auto;
+      padding: var(--gap-lg);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap-lg);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       HEADER - Instrument Front Panel
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .header {
+      background: var(--panel-bg);
+      border: 1px solid var(--screen-border);
+      border-radius: var(--radius-lg);
+      padding: var(--gap-md) var(--gap-lg);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+
+      /* Bezel effect */
+      box-shadow:
+        inset 0 1px 0 var(--bezel-highlight),
+        0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Corner tick marks - oscilloscope graticule style */
+    .header::before,
+    .header::after {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--phosphor-dim);
+      opacity: 0.4;
+    }
+    .header::before {
+      top: 8px;
+      left: 8px;
+      border-right: none;
+      border-bottom: none;
+    }
+    .header::after {
+      bottom: 8px;
+      right: 8px;
+      border-left: none;
+      border-top: none;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: var(--gap-md);
+    }
+
+    .logo-mark {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, var(--phosphor) 0%, var(--cyan) 100%);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 20px;
+      color: var(--case-dark);
+      box-shadow:
+        0 0 20px var(--phosphor-glow),
+        inset 0 1px 0 rgba(255,255,255,0.2);
+      animation: logoPulse 3s ease-in-out infinite;
+    }
+
+    @keyframes logoPulse {
+      0%, 100% { box-shadow: 0 0 20px var(--phosphor-glow); }
+      50% { box-shadow: 0 0 30px var(--phosphor-intense), 0 0 60px var(--phosphor-glow); }
+    }
+
+    .logo-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .logo-title {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      color: var(--phosphor);
+      text-shadow: 0 0 20px var(--phosphor-glow);
+    }
+
+    .logo-subtitle {
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    /* Tab Navigation - Rotary switch style */
+    .tab-nav {
+      display: flex;
+      background: var(--case-dark);
+      border: 2px solid var(--screen-border);
+      border-radius: 30px;
+      padding: 4px;
+      position: relative;
+    }
+
+    .tab-btn {
+      padding: 12px 28px;
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      background: transparent;
+      border: none;
+      border-radius: 26px;
+      cursor: pointer;
+      transition: all var(--transition-normal);
+      position: relative;
+      z-index: 1;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-secondary);
+    }
+
+    .tab-btn.active {
+      color: var(--case-dark);
+      background: var(--phosphor);
+      box-shadow:
+        0 0 20px var(--phosphor-glow),
+        inset 0 1px 0 rgba(255,255,255,0.3);
+    }
+
+    /* System Reset Button */
+    .reset-btn {
+      padding: 10px 20px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      background: var(--case-dark);
+      border: 2px solid var(--screen-border);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .reset-btn:hover {
+      color: var(--error);
+      border-color: var(--error);
+      background: var(--error-glow);
+      box-shadow: 0 0 20px var(--error-glow);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       ERROR DISPLAY - Warning Banner
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .error-banner {
+      display: none;
+      padding: var(--gap-md);
+      background: var(--error-glow);
+      border: 2px solid var(--error);
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      color: var(--error);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .error-banner.visible {
+      display: flex;
+      align-items: center;
+      gap: var(--gap-md);
+      animation: errorFlash 0.5s ease;
+    }
+
+    @keyframes errorFlash {
+      0%, 50% { opacity: 0.5; }
+      25%, 75%, 100% { opacity: 1; }
+    }
+
+    .error-banner::before {
+      content: '⚠';
+      font-size: 20px;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       MAIN CONTENT
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tab-content {
+      display: none;
+      flex: 1;
+    }
+
+    .tab-content.active {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       INSTRUMENT PANEL - Base Component
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .panel {
+      background: var(--panel-bg);
+      border: 1px solid var(--screen-border);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+
+      box-shadow:
+        inset 0 1px 0 var(--bezel-highlight),
+        0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .panel-header {
+      padding: var(--gap-md);
+      border-bottom: 1px solid var(--screen-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--panel-surface);
+    }
+
+    .panel-title {
+      font-family: var(--font-display);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: var(--gap-sm);
+    }
+
+    .panel-title::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      background: var(--phosphor);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--phosphor);
+      animation: indicatorPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes indicatorPulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+
+    .panel-body {
+      padding: var(--gap-md);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       MOSAIQUE TAB - 4 Column Layout
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .mosaique-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.3fr 300px;
+      gap: var(--gap-lg);
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       UPLOAD SLOTS - Input Channels
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .upload-stack {
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap-md);
+      flex: 1;
+    }
+
+    .upload-slot {
+      flex: 1;
+      min-height: 130px;
+      background: var(--screen-bg);
+      border: 2px dashed var(--screen-border);
+      border-radius: var(--radius-md);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all var(--transition-normal);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .upload-slot input { display: none; }
+
+    .upload-slot:hover {
+      border-color: var(--phosphor-dim);
+      background: rgba(0, 255, 157, 0.02);
+    }
+
+    .upload-slot.dragover {
+      border-color: var(--phosphor);
+      border-style: solid;
+      background: var(--phosphor-glow);
+      box-shadow: inset 0 0 30px var(--phosphor-glow);
+    }
+
+    .upload-slot.has-image {
+      border-style: solid;
+      border-color: var(--phosphor-dim);
+    }
+
+    /* Slot channel indicator */
+    .slot-channel {
+      position: absolute;
+      top: var(--gap-sm);
+      left: var(--gap-sm);
+      padding: 4px 10px;
+      font-family: var(--font-display);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      border-radius: var(--radius-sm);
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .slot-channel::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    .slot-channel.ch-r {
+      background: rgba(255, 77, 77, 0.15);
+      color: var(--red-channel);
+      border: 1px solid rgba(255, 77, 77, 0.3);
+    }
+    .slot-channel.ch-r::before { background: var(--red-channel); }
+
+    .slot-channel.ch-g {
+      background: rgba(77, 255, 77, 0.15);
+      color: var(--green-channel);
+      border: 1px solid rgba(77, 255, 77, 0.3);
+    }
+    .slot-channel.ch-g::before { background: var(--green-channel); }
+
+    .slot-channel.ch-b {
+      background: rgba(77, 159, 255, 0.15);
+      color: var(--blue-channel);
+      border: 1px solid rgba(77, 159, 255, 0.3);
+    }
+    .slot-channel.ch-b::before { background: var(--blue-channel); }
+
+    /* Remove button */
+    .remove-btn {
+      position: absolute;
+      top: var(--gap-sm);
+      right: var(--gap-sm);
+      width: 24px;
+      height: 24px;
+      background: var(--case-dark);
+      border: 1px solid var(--screen-border);
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+      font-size: 16px;
+      cursor: pointer;
+      opacity: 0;
+      transition: all var(--transition-fast);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 5;
+    }
+
+    .upload-slot:hover .remove-btn { opacity: 1; }
+    .remove-btn:hover {
+      color: var(--error);
+      border-color: var(--error);
+      background: var(--error-glow);
+    }
+
+    /* Upload placeholder */
+    .upload-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--gap-sm);
+      color: var(--text-muted);
+    }
+
+    .upload-icon {
+      font-size: 28px;
+      color: var(--text-dim);
+    }
+
+    .upload-label {
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    /* Image preview */
+    .upload-slot img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      padding: var(--gap-sm);
+    }
+
+    /* Dimension readout */
+    .dimension-readout {
+      margin-top: var(--gap-sm);
+      padding: var(--gap-sm) var(--gap-md);
+      background: var(--screen-bg);
+      border: 1px solid var(--screen-border);
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      color: var(--amber);
+      text-align: center;
+      display: none;
+    }
+
+    .dimension-readout.visible {
+      display: block;
+    }
+
+    .dimension-readout::before {
+      content: 'DIM: ';
+      color: var(--text-muted);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       MOSAIC PREVIEW - CFA Output Display
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .preview-stack {
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap-md);
+      flex: 1;
+    }
+
+    .preview-screen {
+      flex: 1;
+      min-height: 130px;
+      background: var(--screen-bg);
+      border: 1px solid var(--screen-border);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+
+      /* CRT screen effect */
+      box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Graticule corners */
+    .preview-screen::before,
+    .preview-screen::after {
+      content: '';
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border: 1px solid var(--screen-border);
+      opacity: 0.5;
+      z-index: 3;
+    }
+    .preview-screen::before {
+      top: 6px;
+      left: 6px;
+      border-right: none;
+      border-bottom: none;
+    }
+    .preview-screen::after {
+      bottom: 6px;
+      right: 6px;
+      border-left: none;
+      border-top: none;
+    }
+
+    .preview-screen canvas {
+      max-width: calc(100% - 16px);
+      max-height: calc(100% - 16px);
+      object-fit: contain;
+    }
+
+    .screen-placeholder {
+      font-size: 9px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    /* Channel badge */
+    .channel-tag {
+      position: absolute;
+      top: var(--gap-sm);
+      left: var(--gap-sm);
+      padding: 3px 8px;
+      font-family: var(--font-display);
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      border-radius: var(--radius-sm);
+      z-index: 5;
+    }
+
+    .channel-tag.r {
+      background: rgba(255, 77, 77, 0.2);
+      color: var(--red-channel);
+      border: 1px solid rgba(255, 77, 77, 0.4);
+    }
+    .channel-tag.g {
+      background: rgba(77, 255, 77, 0.2);
+      color: var(--green-channel);
+      border: 1px solid rgba(77, 255, 77, 0.4);
+    }
+    .channel-tag.b {
+      background: rgba(77, 159, 255, 0.2);
+      color: var(--blue-channel);
+      border: 1px solid rgba(77, 159, 255, 0.4);
+    }
+
+    /* View Toggle Switch */
+    .view-toggle {
+      display: flex;
+      align-items: center;
+      gap: var(--gap-sm);
+      font-size: 9px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .toggle-track {
+      width: 48px;
+      height: 24px;
+      background: var(--case-dark);
+      border: 2px solid var(--screen-border);
+      border-radius: 12px;
+      cursor: pointer;
+      position: relative;
+      transition: all var(--transition-fast);
+    }
+
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 14px;
+      height: 14px;
+      background: var(--text-muted);
+      border-radius: 50%;
+      transition: all var(--transition-fast);
+    }
+
+    .toggle-track.active {
+      border-color: var(--phosphor-dim);
+      background: var(--phosphor-glow);
+    }
+
+    .toggle-track.active::after {
+      left: 27px;
+      background: var(--phosphor);
+      box-shadow: 0 0 10px var(--phosphor);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       COMBINED OUTPUT - Main Display
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .output-display {
+      flex: 1;
+      min-height: 400px;
+      background: var(--screen-bg);
+      border: 1px solid var(--screen-border);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+
+      box-shadow:
+        inset 0 0 80px rgba(0, 0, 0, 0.6),
+        0 0 30px rgba(0, 255, 157, 0.05);
+    }
+
+    /* Corner graticules */
+    .output-display::before,
+    .output-display::after {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--phosphor-dim);
+      opacity: 0.3;
+      z-index: 3;
+    }
+    .output-display::before {
+      top: 12px;
+      left: 12px;
+      border-right: none;
+      border-bottom: none;
+    }
+    .output-display::after {
+      bottom: 12px;
+      right: 12px;
+      border-left: none;
+      border-top: none;
+    }
+
+    .output-display canvas {
+      max-width: calc(100% - 32px);
+      max-height: calc(100% - 32px);
+      object-fit: contain;
+    }
+
+    /* Status indicator */
+    .output-status {
+      position: absolute;
+      bottom: var(--gap-md);
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 16px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid var(--screen-border);
+      border-radius: var(--radius-sm);
+      font-size: 9px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      z-index: 5;
+    }
+
+    .output-status.ready {
+      color: var(--phosphor);
+      border-color: var(--phosphor-dim);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       EXPORT PANEL - Save Controls
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .export-controls {
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap-md);
+      flex: 1;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap-sm);
+    }
+
+    .control-label {
+      font-family: var(--font-display);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    /* Format selector buttons */
+    .format-selector {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--gap-sm);
+    }
+
+    .format-btn {
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--case-dark);
+      border: 2px solid var(--screen-border);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .format-btn:hover {
+      color: var(--text-secondary);
+      border-color: var(--bezel-highlight);
+    }
+
+    .format-btn.active {
+      color: var(--phosphor);
+      border-color: var(--phosphor);
+      background: var(--phosphor-glow);
+      box-shadow: 0 0 15px var(--phosphor-glow);
+    }
+
+    .format-hint {
+      font-size: 9px;
+      color: var(--text-muted);
+      margin-top: var(--gap-xs);
+      letter-spacing: 0.5px;
+    }
+
+    .format-hint.msq3 {
+      color: var(--cyan);
+    }
+
+    .format-hint.j2k {
+      color: var(--amber);
+    }
+
+    /* Quality slider */
+    .quality-control {
+      display: none;
+    }
+
+    .quality-control.visible {
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap-sm);
+    }
+
+    .quality-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .quality-value {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--phosphor);
+      text-shadow: 0 0 10px var(--phosphor-glow);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 8px;
+      appearance: none;
+      background: var(--case-dark);
+      border: 1px solid var(--screen-border);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      background: var(--phosphor);
+      border: 2px solid var(--phosphor-bright);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 15px var(--phosphor-glow);
+    }
+
+    /* Size estimate display */
+    .size-readout {
+      padding: var(--gap-md);
+      background: var(--screen-bg);
+      border: 1px solid var(--screen-border);
+      border-radius: var(--radius-md);
+      text-align: center;
+    }
+
+    .size-label {
+      font-size: 9px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: var(--gap-xs);
+    }
+
+    .size-value {
+      font-family: var(--font-display);
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--amber);
+      text-shadow: 0 0 15px var(--amber-glow);
+    }
+
+    .size-unit {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-left: 4px;
+    }
+
+    /* Save button */
+    .save-btn {
+      padding: 18px;
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--case-dark);
+      background: linear-gradient(180deg, var(--phosphor-bright) 0%, var(--phosphor) 100%);
+      border: none;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      margin-top: auto;
+
+      box-shadow:
+        0 4px 20px var(--phosphor-glow),
+        inset 0 1px 0 rgba(255,255,255,0.3);
+    }
+
+    .save-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow:
+        0 8px 30px var(--phosphor-glow),
+        0 0 40px var(--phosphor-glow),
+        inset 0 1px 0 rgba(255,255,255,0.3);
+    }
+
+    .save-btn:disabled {
+      background: var(--bezel);
+      color: var(--text-dim);
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       DE-MOSAIQUE TAB - 3 Column Layout
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .demosaique-layout {
+      display: grid;
+      grid-template-columns: 320px 1fr 1fr;
+      gap: var(--gap-lg);
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* Large upload slot */
+    .upload-large {
+      min-height: 320px;
+    }
+
+    /* Channel grid */
+    .channel-stack {
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap-md);
+      flex: 1;
+    }
+
+    /* Algorithm selector */
+    .algo-selector {
+      display: flex;
+      background: var(--case-dark);
+      border: 2px solid var(--screen-border);
+      border-radius: var(--radius-md);
+      padding: 3px;
+    }
+
+    .algo-btn {
+      flex: 1;
+      padding: 10px 12px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .algo-btn:hover {
+      color: var(--text-secondary);
+    }
+
+    .algo-btn.active {
+      color: var(--case-dark);
+      background: var(--cyan);
+      box-shadow: 0 0 15px var(--cyan-glow);
+    }
+
+    /* Reconstruction outputs */
+    .recon-stack {
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap-md);
+      flex: 1;
+    }
+
+    .recon-item {
+      flex: 1;
+      display: flex;
+      gap: var(--gap-sm);
+      min-height: 100px;
+    }
+
+    .recon-preview {
+      flex: 1;
+      background: var(--screen-bg);
+      border: 1px solid var(--screen-border);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .recon-preview canvas {
+      max-width: calc(100% - 16px);
+      max-height: calc(100% - 16px);
+      object-fit: contain;
+    }
+
+    .item-save-btn {
+      width: 50px;
+      background: var(--case-dark);
+      border: 1px solid var(--screen-border);
+      border-radius: var(--radius-md);
+      color: var(--text-muted);
+      font-size: 9px;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+    }
+
+    .item-save-btn:hover:not(:disabled) {
+      color: var(--cyan);
+      border-color: var(--cyan);
+      background: var(--cyan-glow);
+    }
+
+    .item-save-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* Save all button */
+    .save-all-btn {
+      padding: 16px;
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--case-dark);
+      background: linear-gradient(180deg, #4de8ff 0%, var(--cyan) 100%);
+      border: none;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      margin-top: auto;
+
+      box-shadow:
+        0 4px 20px var(--cyan-glow),
+        inset 0 1px 0 rgba(255,255,255,0.3);
+    }
+
+    .save-all-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow:
+        0 8px 30px var(--cyan-glow),
+        0 0 40px var(--cyan-glow);
+    }
+
+    .save-all-btn:disabled {
+      background: var(--bezel);
+      color: var(--text-dim);
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       ZOOM MODAL
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .zoom-btn {
+      position: absolute;
+      bottom: var(--gap-sm);
+      right: var(--gap-sm);
+      width: 28px;
+      height: 28px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid var(--screen-border);
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+      font-size: 14px;
+      cursor: pointer;
+      opacity: 0;
+      transition: all var(--transition-fast);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .preview-screen:hover .zoom-btn,
+    .output-display:hover .zoom-btn,
+    .upload-slot.has-image:hover .zoom-btn,
+    .recon-preview:hover .zoom-btn {
+      opacity: 1;
+    }
+
+    .zoom-btn:hover {
+      color: var(--phosphor);
+      border-color: var(--phosphor);
+      background: rgba(0, 255, 157, 0.15);
+    }
+
+    .zoom-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.95);
+      z-index: 100000;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: zoom-out;
+    }
+
+    .zoom-modal.active {
+      display: flex;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .zoom-header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: var(--gap-md) var(--gap-lg);
+      background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, transparent 100%);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+
+    .zoom-title {
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      color: var(--phosphor);
+      text-transform: uppercase;
+    }
+
+    .zoom-controls {
+      display: flex;
+      gap: var(--gap-sm);
+    }
+
+    .zoom-control-btn {
+      width: 36px;
+      height: 36px;
+      background: var(--case-dark);
+      border: 1px solid var(--screen-border);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-size: 18px;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .zoom-control-btn:hover {
+      color: var(--phosphor);
+      border-color: var(--phosphor);
+      background: var(--phosphor-glow);
+    }
+
+    .zoom-close {
+      width: 36px;
+      height: 36px;
+      background: var(--case-dark);
+      border: 1px solid var(--screen-border);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-size: 20px;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .zoom-close:hover {
+      color: var(--error);
+      border-color: var(--error);
+      background: var(--error-glow);
+    }
+
+    .zoom-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      width: 100%;
+      padding: 60px var(--gap-lg) var(--gap-lg);
+    }
+
+    .zoom-image-wrapper {
+      position: relative;
+      cursor: grab;
+      transform-origin: center center;
+      transition: transform 0.1s ease-out;
+    }
+
+    .zoom-image-wrapper:active {
+      cursor: grabbing;
+    }
+
+    .zoom-image-wrapper img,
+    .zoom-image-wrapper canvas {
+      max-width: 90vw;
+      max-height: 85vh;
+      object-fit: contain;
+      image-rendering: pixelated;
+      border: 2px solid var(--screen-border);
+      box-shadow: 0 0 60px rgba(0, 0, 0, 0.8);
+    }
+
+    .zoom-info {
+      position: absolute;
+      bottom: var(--gap-lg);
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 16px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid var(--screen-border);
+      border-radius: var(--radius-md);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-secondary);
+      display: flex;
+      gap: var(--gap-md);
+      z-index: 10;
+    }
+
+    .zoom-info span {
+      color: var(--amber);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       RESPONSIVE ADAPTATIONS
+       ═══════════════════════════════════════════════════════════════════ */
+
+    @media (max-width: 1400px) {
+      .mosaique-layout {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto;
+      }
+
+      .mosaique-layout > .panel:nth-child(3) {
+        grid-column: 1 / -1;
+      }
+
+      .mosaique-layout > .panel:nth-child(4) {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 1100px) {
+      .demosaique-layout {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .demosaique-layout > .panel:first-child {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .instrument-case {
+        padding: var(--gap-md);
+      }
+
+      .header {
+        flex-direction: column;
+        gap: var(--gap-md);
+        padding: var(--gap-md);
+      }
+
+      .tab-nav {
+        width: 100%;
+      }
+
+      .tab-btn {
+        flex: 1;
+        padding: 10px 16px;
+        font-size: 10px;
+      }
+
+      .mosaique-layout,
+      .demosaique-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .mosaique-layout > .panel,
+      .demosaique-layout > .panel {
+        grid-column: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="instrument-case">
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         HEADER - Instrument Control Panel
+         ═══════════════════════════════════════════════════════════════════ -->
+    <header class="header">
+      <div class="logo">
+        <div class="logo-mark">M</div>
+        <div class="logo-text">
+          <div class="logo-title">MINRA-MOSAIQUE</div>
+          <div class="logo-subtitle">Bayer CFA Image Processor v2.0</div>
+        </div>
+      </div>
+
+      <nav class="tab-nav">
+        <button class="tab-btn active" data-tab="mosaique">Mosaique</button>
+        <button class="tab-btn" data-tab="demosaique">De-Mosaique</button>
+      </nav>
+
+      <button class="reset-btn" onclick="resetAll()">System Reset</button>
+    </header>
+
+    <!-- Error Banner -->
+    <div id="errorBanner" class="error-banner"></div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         MAIN CONTENT AREA
+         ═══════════════════════════════════════════════════════════════════ -->
+    <main class="main-content">
+
+      <!-- ═════════════════════════════════════════════════════════════════
+           MOSAIQUE TAB - Combine 3 Images
+           ═════════════════════════════════════════════════════════════════ -->
+      <div id="mosaiqueTab" class="tab-content active">
+        <div class="mosaique-layout">
+
+          <!-- Column 1: Input Channels -->
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Input Channels</span>
+            </div>
+            <div class="panel-body">
+              <div class="upload-stack">
+                <div class="upload-slot" id="uploadSlot1" onclick="document.getElementById('fileInput1').click()">
+                  <span class="slot-channel ch-r">CH-R</span>
+                  <input type="file" id="fileInput1" accept="image/*" onchange="handleUpload(1, this.files[0])">
+                  <div class="upload-placeholder">
+                    <span class="upload-icon">+</span>
+                    <span class="upload-label">Input Image 1</span>
+                  </div>
+                  <button class="remove-btn" onclick="event.stopPropagation(); removeImage(1)">×</button>
+                  <button class="zoom-btn" onclick="event.stopPropagation(); openZoomModal(this.parentElement, 'Input Image 1')">⌕</button>
+                </div>
+
+                <div class="upload-slot" id="uploadSlot2" onclick="document.getElementById('fileInput2').click()">
+                  <span class="slot-channel ch-g">CH-G</span>
+                  <input type="file" id="fileInput2" accept="image/*" onchange="handleUpload(2, this.files[0])">
+                  <div class="upload-placeholder">
+                    <span class="upload-icon">+</span>
+                    <span class="upload-label">Input Image 2</span>
+                  </div>
+                  <button class="remove-btn" onclick="event.stopPropagation(); removeImage(2)">×</button>
+                  <button class="zoom-btn" onclick="event.stopPropagation(); openZoomModal(this.parentElement, 'Input Image 2')">⌕</button>
+                </div>
+
+                <div class="upload-slot" id="uploadSlot3" onclick="document.getElementById('fileInput3').click()">
+                  <span class="slot-channel ch-b">CH-B</span>
+                  <input type="file" id="fileInput3" accept="image/*" onchange="handleUpload(3, this.files[0])">
+                  <div class="upload-placeholder">
+                    <span class="upload-icon">+</span>
+                    <span class="upload-label">Input Image 3</span>
+                  </div>
+                  <button class="remove-btn" onclick="event.stopPropagation(); removeImage(3)">×</button>
+                  <button class="zoom-btn" onclick="event.stopPropagation(); openZoomModal(this.parentElement, 'Input Image 3')">⌕</button>
+                </div>
+              </div>
+              <div id="dimensionReadout" class="dimension-readout"></div>
+            </div>
+          </div>
+
+          <!-- Column 2: CFA Output -->
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">CFA Output</span>
+              <div class="view-toggle">
+                <span>BW</span>
+                <div class="toggle-track" id="colorToggle" onclick="toggleColorView()"></div>
+                <span>Color</span>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="preview-stack">
+                <div class="preview-screen" id="mosaicPreview1">
+                  <span class="channel-tag r">R</span>
+                  <span class="screen-placeholder">No Signal</span>
+                  <button class="zoom-btn" onclick="openZoomModal(this.parentElement, 'CFA Channel R')">⌕</button>
+                </div>
+                <div class="preview-screen" id="mosaicPreview2">
+                  <span class="channel-tag g">G</span>
+                  <span class="screen-placeholder">No Signal</span>
+                  <button class="zoom-btn" onclick="openZoomModal(this.parentElement, 'CFA Channel G')">⌕</button>
+                </div>
+                <div class="preview-screen" id="mosaicPreview3">
+                  <span class="channel-tag b">B</span>
+                  <span class="screen-placeholder">No Signal</span>
+                  <button class="zoom-btn" onclick="openZoomModal(this.parentElement, 'CFA Channel B')">⌕</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column 3: Combined Output -->
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Combined Output</span>
+            </div>
+            <div class="panel-body">
+              <div class="output-display" id="combinedPreview">
+                <span class="screen-placeholder">Awaiting 3 Input Signals</span>
+                <div class="output-status" id="outputStatus">Standby</div>
+                <button class="zoom-btn" onclick="openZoomModal(this.parentElement, 'Combined Output')">⌕</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column 4: Export Controls -->
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Export</span>
+            </div>
+            <div class="panel-body">
+              <div class="export-controls">
+                <div class="control-group">
+                  <span class="control-label">Output Format</span>
+                  <div class="format-selector">
+                    <button class="format-btn active" data-format="png" onclick="setFormat('png')">PNG</button>
+                    <button class="format-btn" data-format="msq3" onclick="setFormat('msq3')">MSQ3</button>
+                    <button class="format-btn" data-format="j2k" onclick="setFormat('j2k')">J2K</button>
+                  </div>
+                  <div class="format-hint" id="formatHint">Lossless, larger file size</div>
+                </div>
+
+                <div class="control-group quality-control" id="qualityControl">
+                  <div class="quality-header">
+                    <span class="control-label">Channel Compression</span>
+                    <span class="quality-value" id="qualityValue">85%</span>
+                  </div>
+                  <input type="range" id="qualitySlider" min="1" max="100" value="85" oninput="updateQuality()">
+                </div>
+
+                <div class="size-readout">
+                  <div class="size-label">Estimated File Size</div>
+                  <div class="size-value" id="sizeValue">--<span class="size-unit"></span></div>
+                </div>
+
+                <button class="save-btn" id="saveBtn" onclick="saveCombined()" disabled>
+                  Export Combined Image
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ═════════════════════════════════════════════════════════════════
+           DE-MOSAIQUE TAB - Split to 3 Images
+           ═════════════════════════════════════════════════════════════════ -->
+      <div id="demosaiqueTab" class="tab-content">
+        <div class="demosaique-layout">
+
+          <!-- Column 1: Combined Input -->
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Combined Input</span>
+            </div>
+            <div class="panel-body">
+              <div class="upload-slot upload-large" id="uploadSlotCombined" onclick="document.getElementById('fileInputCombined').click()">
+                <input type="file" id="fileInputCombined" accept="image/*,.msq3,.j2k,.jp2" onchange="handleCombinedUpload(this.files[0])">
+                <div class="upload-placeholder">
+                  <span class="upload-icon">+</span>
+                  <span class="upload-label">Load Image, MSQ3, or J2K</span>
+                </div>
+                <button class="remove-btn" onclick="event.stopPropagation(); removeCombinedImage()">×</button>
+                <button class="zoom-btn" onclick="event.stopPropagation(); openZoomModal(this.parentElement, 'Combined Input')">⌕</button>
+              </div>
+              <div id="combinedDimensionReadout" class="dimension-readout"></div>
+            </div>
+          </div>
+
+          <!-- Column 2: Extracted Channels -->
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Channel Extraction</span>
+              <div class="algo-selector">
+                <button class="algo-btn" data-algo="nearest_neighbor" onclick="setAlgorithm('nearest_neighbor')">NN</button>
+                <button class="algo-btn" data-algo="bilinear" onclick="setAlgorithm('bilinear')">Bilinear</button>
+                <button class="algo-btn active" data-algo="malvar_he_cutler" onclick="setAlgorithm('malvar_he_cutler')">MHC</button>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="channel-stack">
+                <div class="preview-screen" id="channelR">
+                  <span class="channel-tag r">R-CFA</span>
+                  <span class="screen-placeholder">No Signal</span>
+                  <button class="zoom-btn" onclick="openZoomModal(this.parentElement, 'Extracted R Channel')">⌕</button>
+                </div>
+                <div class="preview-screen" id="channelG">
+                  <span class="channel-tag g">G-CFA</span>
+                  <span class="screen-placeholder">No Signal</span>
+                  <button class="zoom-btn" onclick="openZoomModal(this.parentElement, 'Extracted G Channel')">⌕</button>
+                </div>
+                <div class="preview-screen" id="channelB">
+                  <span class="channel-tag b">B-CFA</span>
+                  <span class="screen-placeholder">No Signal</span>
+                  <button class="zoom-btn" onclick="openZoomModal(this.parentElement, 'Extracted B Channel')">⌕</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column 3: Reconstructed Outputs -->
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Reconstructed Output</span>
+            </div>
+            <div class="panel-body">
+              <div class="recon-stack">
+                <div class="recon-item">
+                  <div class="recon-preview" id="recon1">
+                    <span class="channel-tag r">IMG-1</span>
+                    <span class="screen-placeholder">Awaiting Process</span>
+                    <button class="zoom-btn" onclick="openZoomModal(this.parentElement, 'Reconstructed Image 1')">⌕</button>
+                  </div>
+                  <button class="item-save-btn" onclick="saveReconstructed(1)" disabled id="saveRecon1">SAVE</button>
+                </div>
+                <div class="recon-item">
+                  <div class="recon-preview" id="recon2">
+                    <span class="channel-tag g">IMG-2</span>
+                    <span class="screen-placeholder">Awaiting Process</span>
+                    <button class="zoom-btn" onclick="openZoomModal(this.parentElement, 'Reconstructed Image 2')">⌕</button>
+                  </div>
+                  <button class="item-save-btn" onclick="saveReconstructed(2)" disabled id="saveRecon2">SAVE</button>
+                </div>
+                <div class="recon-item">
+                  <div class="recon-preview" id="recon3">
+                    <span class="channel-tag b">IMG-3</span>
+                    <span class="screen-placeholder">Awaiting Process</span>
+                    <button class="zoom-btn" onclick="openZoomModal(this.parentElement, 'Reconstructed Image 3')">⌕</button>
+                  </div>
+                  <button class="item-save-btn" onclick="saveReconstructed(3)" disabled id="saveRecon3">SAVE</button>
+                </div>
+              </div>
+              <button class="save-all-btn" id="saveAllBtn" onclick="saveAllReconstructed()" disabled>
+                Export All Images
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       ZOOM MODAL
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div id="zoomModal" class="zoom-modal" onclick="closeZoomModal(event)">
+    <div class="zoom-header">
+      <span class="zoom-title" id="zoomTitle">Image Preview</span>
+      <div class="zoom-controls">
+        <button class="zoom-control-btn" onclick="event.stopPropagation(); zoomIn()" title="Zoom In">+</button>
+        <button class="zoom-control-btn" onclick="event.stopPropagation(); zoomOut()" title="Zoom Out">−</button>
+        <button class="zoom-control-btn" onclick="event.stopPropagation(); resetZoom()" title="Reset">⟲</button>
+        <button class="zoom-close" onclick="event.stopPropagation(); closeZoomModal()">&times;</button>
+      </div>
+    </div>
+    <div class="zoom-container">
+      <div class="zoom-image-wrapper" id="zoomWrapper">
+        <!-- Image/canvas will be inserted here -->
+      </div>
+    </div>
+    <div class="zoom-info">
+      <div>Zoom: <span id="zoomLevel">100%</span></div>
+      <div>Dimensions: <span id="zoomDimensions">--</span></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       JAVASCRIPT - Image Processing Engine
+       ═══════════════════════════════════════════════════════════════════ -->
+  <script>
+    // ═══════════════════════════════════════════════════════════════════
+    // STATE MANAGEMENT
+    // ═══════════════════════════════════════════════════════════════════
+    const state = {
+      // Mosaique tab
+      images: [null, null, null],
+      cfas: [null, null, null],
+      combinedCanvas: null,
+      format: 'png',
+      quality: 85,
+      colorView: false,
+
+      // De-Mosaique tab
+      combinedImage: null,
+      extractedCFAs: [null, null, null],
+      reconstructed: [null, null, null],
+      algorithm: 'malvar_he_cutler'
+    };
+
+    // ═══════════════════════════════════════════════════════════════════
+    // TAB NAVIGATION
+    // ═══════════════════════════════════════════════════════════════════
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.getElementById(tab + 'Tab').classList.add('active');
+      });
+    });
+
+    // ═══════════════════════════════════════════════════════════════════
+    // DRAG AND DROP
+    // ═══════════════════════════════════════════════════════════════════
+    function setupDragDrop(slotId, handler) {
+      const slot = document.getElementById(slotId);
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        slot.addEventListener(eventName, e => {
+          e.preventDefault();
+          e.stopPropagation();
+        });
+      });
+      slot.addEventListener('dragenter', () => slot.classList.add('dragover'));
+      slot.addEventListener('dragleave', () => slot.classList.remove('dragover'));
+      slot.addEventListener('drop', e => {
+        slot.classList.remove('dragover');
+        const file = e.dataTransfer.files[0];
+        const name = file ? file.name.toLowerCase() : '';
+        if (file && (file.type.startsWith('image/') || name.endsWith('.msq3') || name.endsWith('.j2k') || name.endsWith('.jp2'))) {
+          handler(file);
+        }
+      });
+    }
+
+    [1, 2, 3].forEach(i => setupDragDrop(`uploadSlot${i}`, file => handleUpload(i, file)));
+    setupDragDrop('uploadSlotCombined', handleCombinedUpload);
+
+    // ═══════════════════════════════════════════════════════════════════
+    // BAYER MOSAIC PROCESSOR
+    // ═══════════════════════════════════════════════════════════════════
+    const BayerMosaicProcessor = {
+      applyMosaic(imageData) {
+        const { width, height, data } = imageData;
+        const cfa = new Uint8Array(width * height);
+
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const i = (y * width + x) * 4;
+            const cfaIdx = y * width + x;
+            if (y % 2 === 0) {
+              cfa[cfaIdx] = (x % 2 === 0) ? data[i] : data[i + 1];
+            } else {
+              cfa[cfaIdx] = (x % 2 === 0) ? data[i + 1] : data[i + 2];
+            }
+          }
+        }
+        return cfa;
+      },
+
+      generateGrayscaleView(cfa, width, height) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.createImageData(width, height);
+
+        for (let i = 0; i < cfa.length; i++) {
+          const idx = i * 4;
+          imgData.data[idx] = cfa[i];
+          imgData.data[idx + 1] = cfa[i];
+          imgData.data[idx + 2] = cfa[i];
+          imgData.data[idx + 3] = 255;
+        }
+
+        ctx.putImageData(imgData, 0, 0);
+        return canvas;
+      },
+
+      generateColorizedView(cfa, width, height) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.createImageData(width, height);
+
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const cfaIdx = y * width + x;
+            const idx = cfaIdx * 4;
+            const val = cfa[cfaIdx];
+
+            imgData.data[idx + 3] = 255;
+
+            if (y % 2 === 0) {
+              if (x % 2 === 0) {
+                imgData.data[idx] = val;
+                imgData.data[idx + 1] = 0;
+                imgData.data[idx + 2] = 0;
+              } else {
+                imgData.data[idx] = 0;
+                imgData.data[idx + 1] = val;
+                imgData.data[idx + 2] = 0;
+              }
+            } else {
+              if (x % 2 === 0) {
+                imgData.data[idx] = 0;
+                imgData.data[idx + 1] = val;
+                imgData.data[idx + 2] = 0;
+              } else {
+                imgData.data[idx] = 0;
+                imgData.data[idx + 1] = 0;
+                imgData.data[idx + 2] = val;
+              }
+            }
+          }
+        }
+
+        ctx.putImageData(imgData, 0, 0);
+        return canvas;
+      }
+    };
+
+    // ═══════════════════════════════════════════════════════════════════
+    // IMAGE COMBINER
+    // ═══════════════════════════════════════════════════════════════════
+    const ImageCombiner = {
+      combine(cfaR, cfaG, cfaB, width, height) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.createImageData(width, height);
+
+        for (let i = 0; i < cfaR.length; i++) {
+          const idx = i * 4;
+          imgData.data[idx] = cfaR[i];
+          imgData.data[idx + 1] = cfaG[i];
+          imgData.data[idx + 2] = cfaB[i];
+          imgData.data[idx + 3] = 255;
+        }
+
+        ctx.putImageData(imgData, 0, 0);
+        return canvas;
+      },
+
+      extractChannel(imageData, channel) {
+        const { width, height, data } = imageData;
+        const cfa = new Uint8Array(width * height);
+        const offset = channel === 'r' ? 0 : channel === 'g' ? 1 : 2;
+
+        for (let i = 0; i < width * height; i++) {
+          cfa[i] = data[i * 4 + offset];
+        }
+        return cfa;
+      }
+    };
+
+    // ═══════════════════════════════════════════════════════════════════
+    // DEMOSAICING ALGORITHMS
+    // ═══════════════════════════════════════════════════════════════════
+    const Demosaicing = {
+      nearestNeighbor(cfa, width, height) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.createImageData(width, height);
+
+        for (let y = 0; y < height - 1; y += 2) {
+          for (let x = 0; x < width - 1; x += 2) {
+            const r = cfa[y * width + x];
+            const g1 = cfa[y * width + x + 1];
+            const g2 = cfa[(y + 1) * width + x];
+            const b = cfa[(y + 1) * width + x + 1];
+            const g = Math.round((g1 + g2) / 2);
+
+            for (let dy = 0; dy < 2; dy++) {
+              for (let dx = 0; dx < 2; dx++) {
+                if (y + dy < height && x + dx < width) {
+                  const idx = ((y + dy) * width + (x + dx)) * 4;
+                  imgData.data[idx] = r;
+                  imgData.data[idx + 1] = g;
+                  imgData.data[idx + 2] = b;
+                  imgData.data[idx + 3] = 255;
+                }
+              }
+            }
+          }
+        }
+
+        if (height % 2 === 1) {
+          for (let x = 0; x < width; x++) {
+            const srcIdx = ((height - 2) * width + x) * 4;
+            const dstIdx = ((height - 1) * width + x) * 4;
+            imgData.data[dstIdx] = imgData.data[srcIdx];
+            imgData.data[dstIdx + 1] = imgData.data[srcIdx + 1];
+            imgData.data[dstIdx + 2] = imgData.data[srcIdx + 2];
+            imgData.data[dstIdx + 3] = 255;
+          }
+        }
+        if (width % 2 === 1) {
+          for (let y = 0; y < height; y++) {
+            const srcIdx = (y * width + width - 2) * 4;
+            const dstIdx = (y * width + width - 1) * 4;
+            imgData.data[dstIdx] = imgData.data[srcIdx];
+            imgData.data[dstIdx + 1] = imgData.data[srcIdx + 1];
+            imgData.data[dstIdx + 2] = imgData.data[srcIdx + 2];
+            imgData.data[dstIdx + 3] = 255;
+          }
+        }
+
+        ctx.putImageData(imgData, 0, 0);
+        return canvas;
+      },
+
+      bilinear(cfa, width, height) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.createImageData(width, height);
+
+        const getCFA = (y, x) => {
+          y = Math.max(0, Math.min(height - 1, y));
+          x = Math.max(0, Math.min(width - 1, x));
+          return cfa[y * width + x];
+        };
+
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const idx = (y * width + x) * 4;
+            let r, g, b;
+
+            if (y % 2 === 0) {
+              if (x % 2 === 0) {
+                r = getCFA(y, x);
+                g = (getCFA(y, x - 1) + getCFA(y, x + 1) + getCFA(y - 1, x) + getCFA(y + 1, x)) / 4;
+                b = (getCFA(y - 1, x - 1) + getCFA(y - 1, x + 1) + getCFA(y + 1, x - 1) + getCFA(y + 1, x + 1)) / 4;
+              } else {
+                g = getCFA(y, x);
+                r = (getCFA(y, x - 1) + getCFA(y, x + 1)) / 2;
+                b = (getCFA(y - 1, x) + getCFA(y + 1, x)) / 2;
+              }
+            } else {
+              if (x % 2 === 0) {
+                g = getCFA(y, x);
+                r = (getCFA(y - 1, x) + getCFA(y + 1, x)) / 2;
+                b = (getCFA(y, x - 1) + getCFA(y, x + 1)) / 2;
+              } else {
+                b = getCFA(y, x);
+                g = (getCFA(y, x - 1) + getCFA(y, x + 1) + getCFA(y - 1, x) + getCFA(y + 1, x)) / 4;
+                r = (getCFA(y - 1, x - 1) + getCFA(y - 1, x + 1) + getCFA(y + 1, x - 1) + getCFA(y + 1, x + 1)) / 4;
+              }
+            }
+
+            imgData.data[idx] = Math.round(Math.max(0, Math.min(255, r)));
+            imgData.data[idx + 1] = Math.round(Math.max(0, Math.min(255, g)));
+            imgData.data[idx + 2] = Math.round(Math.max(0, Math.min(255, b)));
+            imgData.data[idx + 3] = 255;
+          }
+        }
+
+        ctx.putImageData(imgData, 0, 0);
+        return canvas;
+      },
+
+      malvarHeCutler(cfa, width, height) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.createImageData(width, height);
+
+        const getCFA = (y, x) => {
+          if (y < 0) y = -y;
+          if (x < 0) x = -x;
+          if (y >= height) y = 2 * height - y - 2;
+          if (x >= width) x = 2 * width - x - 2;
+          return cfa[y * width + x];
+        };
+
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const idx = (y * width + x) * 4;
+            let r, g, b;
+
+            if (y % 2 === 0) {
+              if (x % 2 === 0) {
+                r = getCFA(y, x);
+                g = (
+                  -getCFA(y - 2, x) +
+                  2 * getCFA(y - 1, x) +
+                  -getCFA(y, x - 2) + 2 * getCFA(y, x - 1) + 4 * getCFA(y, x) + 2 * getCFA(y, x + 1) - getCFA(y, x + 2) +
+                  2 * getCFA(y + 1, x) +
+                  -getCFA(y + 2, x)
+                ) / 8;
+                b = (
+                  -1.5 * getCFA(y - 2, x) +
+                  2 * getCFA(y - 1, x - 1) + 2 * getCFA(y - 1, x + 1) +
+                  -1.5 * getCFA(y, x - 2) + 6 * getCFA(y, x) - 1.5 * getCFA(y, x + 2) +
+                  2 * getCFA(y + 1, x - 1) + 2 * getCFA(y + 1, x + 1) +
+                  -1.5 * getCFA(y + 2, x)
+                ) / 8;
+              } else {
+                g = getCFA(y, x);
+                r = (
+                  0.5 * getCFA(y - 2, x) +
+                  -getCFA(y - 1, x - 1) - getCFA(y - 1, x + 1) +
+                  -getCFA(y, x - 2) + 4 * getCFA(y, x - 1) + 5 * getCFA(y, x) + 4 * getCFA(y, x + 1) - getCFA(y, x + 2) +
+                  -getCFA(y + 1, x - 1) - getCFA(y + 1, x + 1) +
+                  0.5 * getCFA(y + 2, x)
+                ) / 8;
+                b = (
+                  -getCFA(y - 2, x) +
+                  -getCFA(y - 1, x - 1) + 4 * getCFA(y - 1, x) - getCFA(y - 1, x + 1) +
+                  0.5 * getCFA(y, x - 2) + 5 * getCFA(y, x) + 0.5 * getCFA(y, x + 2) +
+                  -getCFA(y + 1, x - 1) + 4 * getCFA(y + 1, x) - getCFA(y + 1, x + 1) +
+                  -getCFA(y + 2, x)
+                ) / 8;
+              }
+            } else {
+              if (x % 2 === 0) {
+                g = getCFA(y, x);
+                r = (
+                  -getCFA(y - 2, x) +
+                  -getCFA(y - 1, x - 1) + 4 * getCFA(y - 1, x) - getCFA(y - 1, x + 1) +
+                  0.5 * getCFA(y, x - 2) + 5 * getCFA(y, x) + 0.5 * getCFA(y, x + 2) +
+                  -getCFA(y + 1, x - 1) + 4 * getCFA(y + 1, x) - getCFA(y + 1, x + 1) +
+                  -getCFA(y + 2, x)
+                ) / 8;
+                b = (
+                  0.5 * getCFA(y - 2, x) +
+                  -getCFA(y - 1, x - 1) - getCFA(y - 1, x + 1) +
+                  -getCFA(y, x - 2) + 4 * getCFA(y, x - 1) + 5 * getCFA(y, x) + 4 * getCFA(y, x + 1) - getCFA(y, x + 2) +
+                  -getCFA(y + 1, x - 1) - getCFA(y + 1, x + 1) +
+                  0.5 * getCFA(y + 2, x)
+                ) / 8;
+              } else {
+                b = getCFA(y, x);
+                g = (
+                  -getCFA(y - 2, x) +
+                  2 * getCFA(y - 1, x) +
+                  -getCFA(y, x - 2) + 2 * getCFA(y, x - 1) + 4 * getCFA(y, x) + 2 * getCFA(y, x + 1) - getCFA(y, x + 2) +
+                  2 * getCFA(y + 1, x) +
+                  -getCFA(y + 2, x)
+                ) / 8;
+                r = (
+                  -1.5 * getCFA(y - 2, x) +
+                  2 * getCFA(y - 1, x - 1) + 2 * getCFA(y - 1, x + 1) +
+                  -1.5 * getCFA(y, x - 2) + 6 * getCFA(y, x) - 1.5 * getCFA(y, x + 2) +
+                  2 * getCFA(y + 1, x - 1) + 2 * getCFA(y + 1, x + 1) +
+                  -1.5 * getCFA(y + 2, x)
+                ) / 8;
+              }
+            }
+
+            imgData.data[idx] = Math.round(Math.max(0, Math.min(255, r)));
+            imgData.data[idx + 1] = Math.round(Math.max(0, Math.min(255, g)));
+            imgData.data[idx + 2] = Math.round(Math.max(0, Math.min(255, b)));
+            imgData.data[idx + 3] = 255;
+          }
+        }
+
+        ctx.putImageData(imgData, 0, 0);
+        return canvas;
+      },
+
+      demosaic(cfa, width, height, algorithm) {
+        switch (algorithm) {
+          case 'nearest_neighbor': return this.nearestNeighbor(cfa, width, height);
+          case 'bilinear': return this.bilinear(cfa, width, height);
+          case 'malvar_he_cutler':
+          default: return this.malvarHeCutler(cfa, width, height);
+        }
+      }
+    };
+
+    // ═══════════════════════════════════════════════════════════════════
+    // FILE HANDLER
+    // ═══════════════════════════════════════════════════════════════════
+    const FileHandler = {
+      loadImage(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = e => {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              canvas.width = img.width;
+              canvas.height = img.height;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0);
+              const imageData = ctx.getImageData(0, 0, img.width, img.height);
+              resolve({ imageData, img, canvas });
+            };
+            img.onerror = () => reject(new Error('Failed to load image'));
+            img.src = e.target.result;
+          };
+          reader.onerror = () => reject(new Error('Failed to read file'));
+          reader.readAsDataURL(file);
+        });
+      },
+
+      exportToBlob(canvas, format, quality) {
+        return new Promise(resolve => {
+          const mimeType = format === 'png' ? 'image/png' : 'image/webp';
+          const q = format === 'png' ? undefined : quality / 100;
+          canvas.toBlob(blob => resolve(blob), mimeType, q);
+        });
+      },
+
+      downloadBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    };
+
+    // ═══════════════════════════════════════════════════════════════════
+    // MSQ3 FORMAT HANDLER
+    // Minra Sequence 3-Channel Format
+    // ═══════════════════════════════════════════════════════════════════
+    const MSQ3Format = {
+      MAGIC: 'MSQ3',
+      VERSION: 1,
+
+      // Convert CFA to grayscale canvas for WebP encoding
+      cfaToCanvas(cfa, width, height) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.createImageData(width, height);
+
+        for (let i = 0; i < cfa.length; i++) {
+          const idx = i * 4;
+          imgData.data[idx] = cfa[i];
+          imgData.data[idx + 1] = cfa[i];
+          imgData.data[idx + 2] = cfa[i];
+          imgData.data[idx + 3] = 255;
+        }
+
+        ctx.putImageData(imgData, 0, 0);
+        return canvas;
+      },
+
+      // Encode 3 CFAs into MSQ3 binary format
+      async encode(cfaR, cfaG, cfaB, width, height, quality) {
+        // Compress each channel as WebP
+        const canvasR = this.cfaToCanvas(cfaR, width, height);
+        const canvasG = this.cfaToCanvas(cfaG, width, height);
+        const canvasB = this.cfaToCanvas(cfaB, width, height);
+
+        const [blobR, blobG, blobB] = await Promise.all([
+          new Promise(resolve => canvasR.toBlob(resolve, 'image/webp', quality / 100)),
+          new Promise(resolve => canvasG.toBlob(resolve, 'image/webp', quality / 100)),
+          new Promise(resolve => canvasB.toBlob(resolve, 'image/webp', quality / 100))
+        ]);
+
+        const [bufR, bufG, bufB] = await Promise.all([
+          blobR.arrayBuffer(),
+          blobG.arrayBuffer(),
+          blobB.arrayBuffer()
+        ]);
+
+        // Build the MSQ3 file
+        // Header: MAGIC(4) + VERSION(1) + WIDTH(4) + HEIGHT(4) + QUALITY(1) = 14 bytes
+        // Then: SIZE_R(4) + DATA_R + SIZE_G(4) + DATA_G + SIZE_B(4) + DATA_B
+        const headerSize = 14;
+        const totalSize = headerSize + 4 + bufR.byteLength + 4 + bufG.byteLength + 4 + bufB.byteLength;
+
+        const buffer = new ArrayBuffer(totalSize);
+        const view = new DataView(buffer);
+        const uint8 = new Uint8Array(buffer);
+
+        let offset = 0;
+
+        // Magic bytes "MSQ3"
+        uint8[offset++] = 77;  // M
+        uint8[offset++] = 83;  // S
+        uint8[offset++] = 81;  // Q
+        uint8[offset++] = 51;  // 3
+
+        // Version
+        uint8[offset++] = this.VERSION;
+
+        // Width (little-endian)
+        view.setUint32(offset, width, true);
+        offset += 4;
+
+        // Height (little-endian)
+        view.setUint32(offset, height, true);
+        offset += 4;
+
+        // Quality
+        uint8[offset++] = quality;
+
+        // R channel
+        view.setUint32(offset, bufR.byteLength, true);
+        offset += 4;
+        uint8.set(new Uint8Array(bufR), offset);
+        offset += bufR.byteLength;
+
+        // G channel
+        view.setUint32(offset, bufG.byteLength, true);
+        offset += 4;
+        uint8.set(new Uint8Array(bufG), offset);
+        offset += bufG.byteLength;
+
+        // B channel
+        view.setUint32(offset, bufB.byteLength, true);
+        offset += 4;
+        uint8.set(new Uint8Array(bufB), offset);
+
+        return new Blob([buffer], { type: 'application/octet-stream' });
+      },
+
+      // Decode MSQ3 file into 3 CFAs
+      async decode(file) {
+        const buffer = await file.arrayBuffer();
+        const view = new DataView(buffer);
+        const uint8 = new Uint8Array(buffer);
+
+        let offset = 0;
+
+        // Verify magic bytes
+        const magic = String.fromCharCode(uint8[0], uint8[1], uint8[2], uint8[3]);
+        if (magic !== this.MAGIC) {
+          throw new Error('Invalid MSQ3 file: bad magic bytes');
+        }
+        offset += 4;
+
+        // Version
+        const version = uint8[offset++];
+        if (version > this.VERSION) {
+          throw new Error(`Unsupported MSQ3 version: ${version}`);
+        }
+
+        // Dimensions
+        const width = view.getUint32(offset, true);
+        offset += 4;
+        const height = view.getUint32(offset, true);
+        offset += 4;
+
+        // Quality (stored for reference)
+        const quality = uint8[offset++];
+
+        // Extract channel blobs
+        const channels = [];
+        for (let i = 0; i < 3; i++) {
+          const size = view.getUint32(offset, true);
+          offset += 4;
+          const data = buffer.slice(offset, offset + size);
+          offset += size;
+          channels.push(new Blob([data], { type: 'image/webp' }));
+        }
+
+        // Decode each WebP blob back to CFA
+        const cfas = await Promise.all(channels.map(blob => this.decodeChannelBlob(blob, width, height)));
+
+        return {
+          width,
+          height,
+          quality,
+          cfaR: cfas[0],
+          cfaG: cfas[1],
+          cfaB: cfas[2]
+        };
+      },
+
+      // Decode a WebP blob back to CFA array
+      async decodeChannelBlob(blob, width, height) {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            const imageData = ctx.getImageData(0, 0, width, height);
+
+            // Extract just the R channel (since it's grayscale, R=G=B)
+            const cfa = new Uint8Array(width * height);
+            for (let i = 0; i < cfa.length; i++) {
+              cfa[i] = imageData.data[i * 4];
+            }
+            resolve(cfa);
+          };
+          img.onerror = () => reject(new Error('Failed to decode channel'));
+          img.src = URL.createObjectURL(blob);
+        });
+      },
+
+      // Check if file is MSQ3 format
+      isMSQ3File(file) {
+        return file.name.toLowerCase().endsWith('.msq3');
+      }
+    };
+
+    // ═══════════════════════════════════════════════════════════════════
+    // J2K FORMAT HANDLER (JPEG 2000)
+    // Per-channel compression using JPEG 2000
+    // ═══════════════════════════════════════════════════════════════════
+    const J2KFormat = {
+      MAGIC: 'J2K3',
+      VERSION: 1,
+
+      // Check if OpenJPEG library is loaded
+      isLibraryLoaded() {
+        return typeof OpenJPEG !== 'undefined';
+      },
+
+      // Encode 3 CFAs into J2K format with per-channel JPEG 2000 compression
+      async encode(cfaR, cfaG, cfaB, width, height, quality) {
+        // Since JPEG 2000 encoding requires external library (OpenJPEG.js),
+        // we'll use a similar approach to MSQ3 but with a different structure
+        // For now, we'll encode each channel as a grayscale image
+
+        // Convert quality (1-100) to JPEG 2000 compression ratio
+        // Higher quality = lower compression ratio
+        const compressionRatio = Math.max(1, Math.round((100 - quality) / 5) + 1);
+
+        // Create grayscale images for each channel
+        const canvasR = MSQ3Format.cfaToCanvas(cfaR, width, height);
+        const canvasG = MSQ3Format.cfaToCanvas(cfaG, width, height);
+        const canvasB = MSQ3Format.cfaToCanvas(cfaB, width, height);
+
+        // Get raw pixel data for each channel
+        const dataR = canvasR.getContext('2d').getImageData(0, 0, width, height);
+        const dataG = canvasG.getContext('2d').getImageData(0, 0, width, height);
+        const dataB = canvasB.getContext('2d').getImageData(0, 0, width, height);
+
+        // Extract just the grayscale values (R channel since R=G=B)
+        const grayR = new Uint8Array(width * height);
+        const grayG = new Uint8Array(width * height);
+        const grayB = new Uint8Array(width * height);
+
+        for (let i = 0; i < width * height; i++) {
+          grayR[i] = dataR.data[i * 4];
+          grayG[i] = dataG.data[i * 4];
+          grayB[i] = dataB.data[i * 4];
+        }
+
+        // If OpenJPEG is available, use it for true J2K encoding
+        if (this.isLibraryLoaded()) {
+          return await this.encodeWithOpenJPEG(grayR, grayG, grayB, width, height, compressionRatio);
+        }
+
+        // Fallback: Use a simple RLE + DEFLATE compression for demonstration
+        // This simulates the structure of J2K with per-channel compression
+        return await this.encodeFallback(grayR, grayG, grayB, width, height, quality);
+      },
+
+      // Fallback encoding without OpenJPEG (uses PNG compression internally)
+      async encodeFallback(grayR, grayG, grayB, width, height, quality) {
+        // We'll compress each channel as grayscale PNG (lossless per-channel)
+        // This demonstrates the concept even without true J2K support
+        const canvasR = this.grayToCanvas(grayR, width, height);
+        const canvasG = this.grayToCanvas(grayG, width, height);
+        const canvasB = this.grayToCanvas(grayB, width, height);
+
+        // Use PNG for each channel (no color space conversion, per-channel compression)
+        const [blobR, blobG, blobB] = await Promise.all([
+          new Promise(resolve => canvasR.toBlob(resolve, 'image/png')),
+          new Promise(resolve => canvasG.toBlob(resolve, 'image/png')),
+          new Promise(resolve => canvasB.toBlob(resolve, 'image/png'))
+        ]);
+
+        const [bufR, bufG, bufB] = await Promise.all([
+          blobR.arrayBuffer(),
+          blobG.arrayBuffer(),
+          blobB.arrayBuffer()
+        ]);
+
+        // Build the J2K3 file (our wrapper format for 3-channel J2K)
+        // Header: MAGIC(4) + VERSION(1) + WIDTH(4) + HEIGHT(4) + QUALITY(1) + FLAGS(1) = 15 bytes
+        const headerSize = 15;
+        const totalSize = headerSize + 4 + bufR.byteLength + 4 + bufG.byteLength + 4 + bufB.byteLength;
+
+        const buffer = new ArrayBuffer(totalSize);
+        const view = new DataView(buffer);
+        const uint8 = new Uint8Array(buffer);
+
+        let offset = 0;
+
+        // Magic bytes "J2K3"
+        uint8[offset++] = 74;  // J
+        uint8[offset++] = 50;  // 2
+        uint8[offset++] = 75;  // K
+        uint8[offset++] = 51;  // 3
+
+        // Version
+        uint8[offset++] = this.VERSION;
+
+        // Width (little-endian)
+        view.setUint32(offset, width, true);
+        offset += 4;
+
+        // Height (little-endian)
+        view.setUint32(offset, height, true);
+        offset += 4;
+
+        // Quality
+        uint8[offset++] = quality;
+
+        // Flags: 0 = fallback mode (PNG), 1 = true J2K
+        uint8[offset++] = 0;
+
+        // R channel
+        view.setUint32(offset, bufR.byteLength, true);
+        offset += 4;
+        uint8.set(new Uint8Array(bufR), offset);
+        offset += bufR.byteLength;
+
+        // G channel
+        view.setUint32(offset, bufG.byteLength, true);
+        offset += 4;
+        uint8.set(new Uint8Array(bufG), offset);
+        offset += bufG.byteLength;
+
+        // B channel
+        view.setUint32(offset, bufB.byteLength, true);
+        offset += 4;
+        uint8.set(new Uint8Array(bufB), offset);
+
+        return new Blob([buffer], { type: 'application/octet-stream' });
+      },
+
+      grayToCanvas(gray, width, height) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.createImageData(width, height);
+
+        for (let i = 0; i < gray.length; i++) {
+          const idx = i * 4;
+          imgData.data[idx] = gray[i];
+          imgData.data[idx + 1] = gray[i];
+          imgData.data[idx + 2] = gray[i];
+          imgData.data[idx + 3] = 255;
+        }
+
+        ctx.putImageData(imgData, 0, 0);
+        return canvas;
+      },
+
+      // Decode J2K3 file into 3 CFAs
+      async decode(file) {
+        const buffer = await file.arrayBuffer();
+        const view = new DataView(buffer);
+        const uint8 = new Uint8Array(buffer);
+
+        let offset = 0;
+
+        // Verify magic bytes
+        const magic = String.fromCharCode(uint8[0], uint8[1], uint8[2], uint8[3]);
+        if (magic !== this.MAGIC) {
+          throw new Error('Invalid J2K file: bad magic bytes');
+        }
+        offset += 4;
+
+        // Version
+        const version = uint8[offset++];
+        if (version > this.VERSION) {
+          throw new Error(`Unsupported J2K version: ${version}`);
+        }
+
+        // Dimensions
+        const width = view.getUint32(offset, true);
+        offset += 4;
+        const height = view.getUint32(offset, true);
+        offset += 4;
+
+        // Quality
+        const quality = uint8[offset++];
+
+        // Flags
+        const flags = uint8[offset++];
+
+        // Extract channel blobs
+        const channels = [];
+        for (let i = 0; i < 3; i++) {
+          const size = view.getUint32(offset, true);
+          offset += 4;
+          const data = buffer.slice(offset, offset + size);
+          offset += size;
+          // Type depends on flags
+          const mimeType = flags === 0 ? 'image/png' : 'image/jp2';
+          channels.push(new Blob([data], { type: mimeType }));
+        }
+
+        // Decode each blob back to CFA
+        const cfas = await Promise.all(channels.map(blob => MSQ3Format.decodeChannelBlob(blob, width, height)));
+
+        return {
+          width,
+          height,
+          quality,
+          cfaR: cfas[0],
+          cfaG: cfas[1],
+          cfaB: cfas[2]
+        };
+      },
+
+      // Check if file is J2K format
+      isJ2KFile(file) {
+        const name = file.name.toLowerCase();
+        return name.endsWith('.j2k') || name.endsWith('.jp2');
+      }
+    };
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ZOOM MODAL CONTROLLER
+    // ═══════════════════════════════════════════════════════════════════
+    const ZoomController = {
+      currentZoom: 1,
+      minZoom: 0.25,
+      maxZoom: 8,
+      zoomStep: 0.25,
+      panX: 0,
+      panY: 0,
+      isDragging: false,
+      lastX: 0,
+      lastY: 0,
+
+      init() {
+        const wrapper = document.getElementById('zoomWrapper');
+
+        // Mouse wheel zoom
+        wrapper.addEventListener('wheel', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.deltaY < 0) {
+            this.zoomIn();
+          } else {
+            this.zoomOut();
+          }
+        }, { passive: false });
+
+        // Pan functionality
+        wrapper.addEventListener('mousedown', (e) => {
+          if (e.button === 0) {
+            this.isDragging = true;
+            this.lastX = e.clientX;
+            this.lastY = e.clientY;
+            e.preventDefault();
+          }
+        });
+
+        document.addEventListener('mousemove', (e) => {
+          if (this.isDragging) {
+            const dx = e.clientX - this.lastX;
+            const dy = e.clientY - this.lastY;
+            this.panX += dx;
+            this.panY += dy;
+            this.lastX = e.clientX;
+            this.lastY = e.clientY;
+            this.updateTransform();
+          }
+        });
+
+        document.addEventListener('mouseup', () => {
+          this.isDragging = false;
+        });
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+          if (document.getElementById('zoomModal').classList.contains('active')) {
+            if (e.key === 'Escape') {
+              closeZoomModal();
+            } else if (e.key === '+' || e.key === '=') {
+              this.zoomIn();
+            } else if (e.key === '-') {
+              this.zoomOut();
+            } else if (e.key === '0') {
+              this.reset();
+            }
+          }
+        });
+      },
+
+      updateTransform() {
+        const wrapper = document.getElementById('zoomWrapper');
+        wrapper.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.currentZoom})`;
+        document.getElementById('zoomLevel').textContent = Math.round(this.currentZoom * 100) + '%';
+      },
+
+      zoomIn() {
+        this.currentZoom = Math.min(this.maxZoom, this.currentZoom + this.zoomStep);
+        this.updateTransform();
+      },
+
+      zoomOut() {
+        this.currentZoom = Math.max(this.minZoom, this.currentZoom - this.zoomStep);
+        this.updateTransform();
+      },
+
+      reset() {
+        this.currentZoom = 1;
+        this.panX = 0;
+        this.panY = 0;
+        this.updateTransform();
+      }
+    };
+
+    // Initialize zoom controller
+    ZoomController.init();
+
+    function openZoomModal(element, title) {
+      const modal = document.getElementById('zoomModal');
+      const wrapper = document.getElementById('zoomWrapper');
+      const titleEl = document.getElementById('zoomTitle');
+      const dimsEl = document.getElementById('zoomDimensions');
+
+      // Clear previous content
+      wrapper.innerHTML = '';
+
+      // Clone the image or canvas
+      let content;
+      const canvas = element.querySelector('canvas');
+      const img = element.querySelector('img');
+
+      if (canvas) {
+        content = document.createElement('canvas');
+        content.width = canvas.width;
+        content.height = canvas.height;
+        content.getContext('2d').drawImage(canvas, 0, 0);
+        dimsEl.textContent = `${canvas.width} × ${canvas.height}`;
+      } else if (img) {
+        content = document.createElement('img');
+        content.src = img.src;
+        // Get natural dimensions
+        content.onload = () => {
+          dimsEl.textContent = `${content.naturalWidth} × ${content.naturalHeight}`;
+        };
+        dimsEl.textContent = 'Loading...';
+      } else {
+        return; // No content to show
+      }
+
+      wrapper.appendChild(content);
+      titleEl.textContent = title || 'Image Preview';
+
+      // Reset zoom state
+      ZoomController.reset();
+
+      // Show modal
+      modal.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeZoomModal(event) {
+      // Only close if clicking on the modal background, not the content
+      if (event && event.target !== event.currentTarget) return;
+
+      const modal = document.getElementById('zoomModal');
+      modal.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    function zoomIn() {
+      ZoomController.zoomIn();
+    }
+
+    function zoomOut() {
+      ZoomController.zoomOut();
+    }
+
+    function resetZoom() {
+      ZoomController.reset();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // MOSAIQUE TAB HANDLERS
+    // ═══════════════════════════════════════════════════════════════════
+    async function handleUpload(slot, file) {
+      if (!file) return;
+
+      try {
+        const { imageData, img, canvas } = await FileHandler.loadImage(file);
+
+        if (state.images.some(i => i !== null)) {
+          const existing = state.images.find(i => i !== null);
+          if (existing.width !== imageData.width || existing.height !== imageData.height) {
+            showError(`Dimension mismatch! All images must be ${existing.width}×${existing.height}px`);
+            return;
+          }
+        }
+
+        hideError();
+        state.images[slot - 1] = imageData;
+
+        const slotEl = document.getElementById(`uploadSlot${slot}`);
+        slotEl.classList.add('has-image');
+
+        const placeholder = slotEl.querySelector('.upload-placeholder');
+        if (placeholder) placeholder.style.display = 'none';
+
+        const existingImg = slotEl.querySelector('img');
+        if (existingImg) existingImg.remove();
+
+        const previewImg = document.createElement('img');
+        previewImg.src = canvas.toDataURL();
+        slotEl.appendChild(previewImg);
+
+        state.cfas[slot - 1] = BayerMosaicProcessor.applyMosaic(imageData);
+        updateMosaicPreview(slot);
+        updateDimensionInfo();
+        tryGenerateCombined();
+
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    function removeImage(slot) {
+      state.images[slot - 1] = null;
+      state.cfas[slot - 1] = null;
+
+      const slotEl = document.getElementById(`uploadSlot${slot}`);
+      slotEl.classList.remove('has-image');
+
+      const img = slotEl.querySelector('img');
+      if (img) img.remove();
+
+      const placeholder = slotEl.querySelector('.upload-placeholder');
+      if (placeholder) placeholder.style.display = '';
+
+      const previewEl = document.getElementById(`mosaicPreview${slot}`);
+      const canvas = previewEl.querySelector('canvas');
+      if (canvas) canvas.remove();
+      const previewPlaceholder = previewEl.querySelector('.screen-placeholder');
+      if (previewPlaceholder) previewPlaceholder.style.display = '';
+
+      state.combinedCanvas = null;
+      const combinedEl = document.getElementById('combinedPreview');
+      const combinedCanvas = combinedEl.querySelector('canvas');
+      if (combinedCanvas) combinedCanvas.remove();
+      const combinedPlaceholder = combinedEl.querySelector('.screen-placeholder');
+      if (combinedPlaceholder) combinedPlaceholder.style.display = '';
+
+      document.getElementById('outputStatus').textContent = 'Standby';
+      document.getElementById('outputStatus').classList.remove('ready');
+      document.getElementById('saveBtn').disabled = true;
+      document.getElementById('sizeValue').innerHTML = '--<span class="size-unit"></span>';
+
+      updateDimensionInfo();
+    }
+
+    function updateMosaicPreview(slot) {
+      const cfa = state.cfas[slot - 1];
+      if (!cfa) return;
+
+      const { width, height } = state.images[slot - 1];
+      const previewEl = document.getElementById(`mosaicPreview${slot}`);
+
+      const existingCanvas = previewEl.querySelector('canvas');
+      if (existingCanvas) existingCanvas.remove();
+
+      const canvas = state.colorView
+        ? BayerMosaicProcessor.generateColorizedView(cfa, width, height)
+        : BayerMosaicProcessor.generateGrayscaleView(cfa, width, height);
+
+      const placeholder = previewEl.querySelector('.screen-placeholder');
+      if (placeholder) placeholder.style.display = 'none';
+      previewEl.appendChild(canvas);
+    }
+
+    function toggleColorView() {
+      state.colorView = !state.colorView;
+      document.getElementById('colorToggle').classList.toggle('active', state.colorView);
+
+      [1, 2, 3].forEach(slot => {
+        if (state.cfas[slot - 1]) updateMosaicPreview(slot);
+      });
+    }
+
+    function updateDimensionInfo() {
+      const infoEl = document.getElementById('dimensionReadout');
+      const validImage = state.images.find(i => i !== null);
+
+      if (validImage) {
+        infoEl.textContent = `${validImage.width} × ${validImage.height} px`;
+        infoEl.classList.add('visible');
+      } else {
+        infoEl.classList.remove('visible');
+      }
+    }
+
+    function tryGenerateCombined() {
+      if (!state.cfas.every(c => c !== null)) return;
+
+      const { width, height } = state.images[0];
+      state.combinedCanvas = ImageCombiner.combine(
+        state.cfas[0], state.cfas[1], state.cfas[2],
+        width, height
+      );
+
+      const combinedEl = document.getElementById('combinedPreview');
+      const existingCanvas = combinedEl.querySelector('canvas');
+      if (existingCanvas) existingCanvas.remove();
+
+      const placeholder = combinedEl.querySelector('.screen-placeholder');
+      if (placeholder) placeholder.style.display = 'none';
+      combinedEl.appendChild(state.combinedCanvas);
+
+      document.getElementById('outputStatus').textContent = 'Ready';
+      document.getElementById('outputStatus').classList.add('ready');
+      document.getElementById('saveBtn').disabled = false;
+      updateSizeEstimate();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // EXPORT CONTROLS
+    // ═══════════════════════════════════════════════════════════════════
+    function setFormat(format) {
+      state.format = format;
+      document.querySelectorAll('.format-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.format === format);
+      });
+
+      const qualityControl = document.getElementById('qualityControl');
+      const formatHint = document.getElementById('formatHint');
+
+      if (format === 'png') {
+        qualityControl.classList.remove('visible');
+        formatHint.textContent = 'Lossless, larger file size';
+        formatHint.className = 'format-hint';
+      } else if (format === 'msq3') {
+        qualityControl.classList.add('visible');
+        formatHint.textContent = 'Per-channel WebP compression';
+        formatHint.className = 'format-hint msq3';
+      } else if (format === 'j2k') {
+        qualityControl.classList.add('visible');
+        formatHint.textContent = 'Per-channel JPEG 2000 (experimental)';
+        formatHint.className = 'format-hint j2k';
+      }
+
+      updateSizeEstimate();
+    }
+
+    function updateQuality() {
+      state.quality = parseInt(document.getElementById('qualitySlider').value);
+      document.getElementById('qualityValue').textContent = state.quality + '%';
+      updateSizeEstimate();
+    }
+
+    async function updateSizeEstimate() {
+      if (!state.cfas.every(c => c !== null)) {
+        document.getElementById('sizeValue').innerHTML = '--<span class="size-unit"></span>';
+        return;
+      }
+
+      let blob;
+      const { width, height } = state.images[0];
+
+      if (state.format === 'png') {
+        blob = await FileHandler.exportToBlob(state.combinedCanvas, 'png', 100);
+      } else if (state.format === 'msq3') {
+        blob = await MSQ3Format.encode(
+          state.cfas[0], state.cfas[1], state.cfas[2],
+          width, height, state.quality
+        );
+      } else if (state.format === 'j2k') {
+        blob = await J2KFormat.encode(
+          state.cfas[0], state.cfas[1], state.cfas[2],
+          width, height, state.quality
+        );
+      }
+
+      const sizeKB = blob.size / 1024;
+      let displaySize, unit;
+      if (sizeKB >= 1024) {
+        displaySize = (sizeKB / 1024).toFixed(1);
+        unit = 'MB';
+      } else {
+        displaySize = sizeKB.toFixed(1);
+        unit = 'KB';
+      }
+
+      document.getElementById('sizeValue').innerHTML = `${displaySize}<span class="size-unit">${unit}</span>`;
+    }
+
+    async function saveCombined() {
+      if (!state.cfas.every(c => c !== null)) return;
+
+      let blob, filename;
+      const { width, height } = state.images[0];
+
+      if (state.format === 'png') {
+        blob = await FileHandler.exportToBlob(state.combinedCanvas, 'png', 100);
+        filename = 'minra-combined.png';
+      } else if (state.format === 'msq3') {
+        blob = await MSQ3Format.encode(
+          state.cfas[0], state.cfas[1], state.cfas[2],
+          width, height, state.quality
+        );
+        filename = 'minra-combined.msq3';
+      } else if (state.format === 'j2k') {
+        blob = await J2KFormat.encode(
+          state.cfas[0], state.cfas[1], state.cfas[2],
+          width, height, state.quality
+        );
+        filename = 'minra-combined.j2k';
+      }
+
+      FileHandler.downloadBlob(blob, filename);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // DE-MOSAIQUE TAB HANDLERS
+    // ═══════════════════════════════════════════════════════════════════
+    async function handleCombinedUpload(file) {
+      if (!file) return;
+
+      try {
+        hideError();
+
+        // Check if it's an MSQ3 file
+        if (MSQ3Format.isMSQ3File(file)) {
+          await handleMSQ3Upload(file);
+          return;
+        }
+
+        // Check if it's a J2K file
+        if (J2KFormat.isJ2KFile(file)) {
+          await handleJ2KUpload(file);
+          return;
+        }
+
+        // Handle regular image file
+        const { imageData, img, canvas } = await FileHandler.loadImage(file);
+
+        state.combinedImage = imageData;
+
+        const slotEl = document.getElementById('uploadSlotCombined');
+        slotEl.classList.add('has-image');
+
+        const placeholder = slotEl.querySelector('.upload-placeholder');
+        if (placeholder) placeholder.style.display = 'none';
+
+        const existingImg = slotEl.querySelector('img');
+        if (existingImg) existingImg.remove();
+
+        const previewImg = document.createElement('img');
+        previewImg.src = canvas.toDataURL();
+        slotEl.appendChild(previewImg);
+
+        const infoEl = document.getElementById('combinedDimensionReadout');
+        infoEl.textContent = `${imageData.width} × ${imageData.height} px`;
+        infoEl.classList.add('visible');
+
+        extractChannels();
+        runDemosaicing();
+
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    async function handleMSQ3Upload(file) {
+      try {
+        const { width, height, quality, cfaR, cfaG, cfaB } = await MSQ3Format.decode(file);
+
+        // Store CFAs directly - no extraction needed!
+        state.extractedCFAs = [cfaR, cfaG, cfaB];
+
+        // Create a combined image for display purposes
+        const combinedCanvas = ImageCombiner.combine(cfaR, cfaG, cfaB, width, height);
+        const ctx = combinedCanvas.getContext('2d');
+        state.combinedImage = ctx.getImageData(0, 0, width, height);
+
+        // Update upload slot UI
+        const slotEl = document.getElementById('uploadSlotCombined');
+        slotEl.classList.add('has-image');
+
+        const placeholder = slotEl.querySelector('.upload-placeholder');
+        if (placeholder) placeholder.style.display = 'none';
+
+        const existingImg = slotEl.querySelector('img');
+        if (existingImg) existingImg.remove();
+
+        const previewImg = document.createElement('img');
+        previewImg.src = combinedCanvas.toDataURL();
+        slotEl.appendChild(previewImg);
+
+        // Update dimension info with MSQ3 indicator
+        const infoEl = document.getElementById('combinedDimensionReadout');
+        infoEl.innerHTML = `${width} × ${height} px <span style="color: var(--cyan);">MSQ3 @${quality}%</span>`;
+        infoEl.classList.add('visible');
+
+        // Display channel previews
+        displayExtractedChannels(width, height);
+
+        // Run demosaicing
+        runDemosaicing();
+
+      } catch (err) {
+        showError('Failed to decode MSQ3: ' + err.message);
+      }
+    }
+
+    async function handleJ2KUpload(file) {
+      try {
+        const { width, height, quality, cfaR, cfaG, cfaB } = await J2KFormat.decode(file);
+
+        // Store CFAs directly - no extraction needed!
+        state.extractedCFAs = [cfaR, cfaG, cfaB];
+
+        // Create a combined image for display purposes
+        const combinedCanvas = ImageCombiner.combine(cfaR, cfaG, cfaB, width, height);
+        const ctx = combinedCanvas.getContext('2d');
+        state.combinedImage = ctx.getImageData(0, 0, width, height);
+
+        // Update upload slot UI
+        const slotEl = document.getElementById('uploadSlotCombined');
+        slotEl.classList.add('has-image');
+
+        const placeholder = slotEl.querySelector('.upload-placeholder');
+        if (placeholder) placeholder.style.display = 'none';
+
+        const existingImg = slotEl.querySelector('img');
+        if (existingImg) existingImg.remove();
+
+        const previewImg = document.createElement('img');
+        previewImg.src = combinedCanvas.toDataURL();
+        slotEl.appendChild(previewImg);
+
+        // Update dimension info with J2K indicator
+        const infoEl = document.getElementById('combinedDimensionReadout');
+        infoEl.innerHTML = `${width} × ${height} px <span style="color: var(--amber);">J2K @${quality}%</span>`;
+        infoEl.classList.add('visible');
+
+        // Display channel previews
+        displayExtractedChannels(width, height);
+
+        // Run demosaicing
+        runDemosaicing();
+
+      } catch (err) {
+        showError('Failed to decode J2K: ' + err.message);
+      }
+    }
+
+    function displayExtractedChannels(width, height) {
+      const channels = ['R', 'G', 'B'];
+      channels.forEach((ch, i) => {
+        const el = document.getElementById('channel' + ch);
+        const existingCanvas = el.querySelector('canvas');
+        if (existingCanvas) existingCanvas.remove();
+
+        const canvas = BayerMosaicProcessor.generateGrayscaleView(
+          state.extractedCFAs[i], width, height
+        );
+
+        const placeholder = el.querySelector('.screen-placeholder');
+        if (placeholder) placeholder.style.display = 'none';
+        el.appendChild(canvas);
+      });
+    }
+
+    function removeCombinedImage() {
+      state.combinedImage = null;
+      state.extractedCFAs = [null, null, null];
+      state.reconstructed = [null, null, null];
+
+      const slotEl = document.getElementById('uploadSlotCombined');
+      slotEl.classList.remove('has-image');
+
+      const img = slotEl.querySelector('img');
+      if (img) img.remove();
+
+      const placeholder = slotEl.querySelector('.upload-placeholder');
+      if (placeholder) placeholder.style.display = '';
+
+      document.getElementById('combinedDimensionReadout').classList.remove('visible');
+
+      ['R', 'G', 'B'].forEach(ch => {
+        const el = document.getElementById('channel' + ch);
+        const canvas = el.querySelector('canvas');
+        if (canvas) canvas.remove();
+        const placeholder = el.querySelector('.screen-placeholder');
+        if (placeholder) placeholder.style.display = '';
+      });
+
+      [1, 2, 3].forEach(i => {
+        const el = document.getElementById('recon' + i);
+        const canvas = el.querySelector('canvas');
+        if (canvas) canvas.remove();
+        const placeholder = el.querySelector('.screen-placeholder');
+        if (placeholder) placeholder.style.display = '';
+        document.getElementById('saveRecon' + i).disabled = true;
+      });
+
+      document.getElementById('saveAllBtn').disabled = true;
+    }
+
+    function extractChannels() {
+      if (!state.combinedImage) return;
+
+      const { width, height } = state.combinedImage;
+
+      state.extractedCFAs[0] = ImageCombiner.extractChannel(state.combinedImage, 'r');
+      state.extractedCFAs[1] = ImageCombiner.extractChannel(state.combinedImage, 'g');
+      state.extractedCFAs[2] = ImageCombiner.extractChannel(state.combinedImage, 'b');
+
+      displayExtractedChannels(width, height);
+    }
+
+    function setAlgorithm(algo) {
+      state.algorithm = algo;
+      document.querySelectorAll('.algo-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.algo === algo);
+      });
+
+      if (state.combinedImage) runDemosaicing();
+    }
+
+    function runDemosaicing() {
+      if (!state.extractedCFAs.every(c => c !== null)) return;
+
+      const { width, height } = state.combinedImage;
+
+      state.reconstructed = state.extractedCFAs.map(cfa =>
+        Demosaicing.demosaic(cfa, width, height, state.algorithm)
+      );
+
+      [1, 2, 3].forEach(i => {
+        const el = document.getElementById('recon' + i);
+        const existingCanvas = el.querySelector('canvas');
+        if (existingCanvas) existingCanvas.remove();
+
+        const placeholder = el.querySelector('.screen-placeholder');
+        if (placeholder) placeholder.style.display = 'none';
+        el.appendChild(state.reconstructed[i - 1]);
+
+        document.getElementById('saveRecon' + i).disabled = false;
+      });
+
+      document.getElementById('saveAllBtn').disabled = false;
+    }
+
+    async function saveReconstructed(index) {
+      const canvas = state.reconstructed[index - 1];
+      if (!canvas) return;
+
+      const blob = await FileHandler.exportToBlob(canvas, 'png', 100);
+      FileHandler.downloadBlob(blob, `minra-reconstructed-${index}.png`);
+    }
+
+    async function saveAllReconstructed() {
+      for (let i = 1; i <= 3; i++) {
+        await saveReconstructed(i);
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // UTILITY FUNCTIONS
+    // ═══════════════════════════════════════════════════════════════════
+    function showError(message) {
+      const el = document.getElementById('errorBanner');
+      el.textContent = message;
+      el.classList.add('visible');
+    }
+
+    function hideError() {
+      document.getElementById('errorBanner').classList.remove('visible');
+    }
+
+    function resetAll() {
+      [1, 2, 3].forEach(i => removeImage(i));
+      state.colorView = false;
+      document.getElementById('colorToggle').classList.remove('active');
+      setFormat('png');
+      document.getElementById('qualitySlider').value = 85;
+      state.quality = 85;
+      document.getElementById('qualityValue').textContent = '85%';
+
+      removeCombinedImage();
+      setAlgorithm('malvar_he_cutler');
+
+      hideError();
+    }
+
+    // Initialize
+    setFormat('png');
+  </script>
+</body>
+</html>
