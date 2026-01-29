@@ -30,6 +30,7 @@ frontend/dist/
 # OS
 .DS_Store
 Thumbs.db
+nul
 
 # Local config
 .claude/
