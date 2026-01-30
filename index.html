@@ -465,6 +465,27 @@
        UPLOAD SLOTS - Input Channels
        ═══════════════════════════════════════════════════════════════════ */
 
+    .batch-upload-btn {
+      padding: 6px 12px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      background: var(--case-dark);
+      border: 1px solid var(--screen-border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .batch-upload-btn:hover {
+      color: var(--phosphor);
+      border-color: var(--phosphor);
+      background: var(--phosphor-glow);
+    }
+
     .upload-stack {
       display: flex;
       flex-direction: column;
@@ -874,7 +895,7 @@
     /* Format selector buttons */
     .format-selector {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       gap: var(--gap-sm);
     }
 
@@ -912,10 +933,6 @@
 
     .format-hint.msq3 {
       color: var(--cyan);
-    }
-
-    .format-hint.j2k {
-      color: var(--amber);
     }
 
     /* Quality slider */
@@ -1473,6 +1490,8 @@
           <div class="panel">
             <div class="panel-header">
               <span class="panel-title">Input Channels</span>
+              <button class="batch-upload-btn" onclick="document.getElementById('batchFileInput').click()">Select 3 Images</button>
+              <input type="file" id="batchFileInput" accept="image/*" multiple style="display:none" onchange="handleBatchUpload(this.files)">
             </div>
             <div class="panel-body">
               <div class="upload-stack">
@@ -1570,7 +1589,6 @@
                   <div class="format-selector">
                     <button class="format-btn active" data-format="png" onclick="setFormat('png')">PNG</button>
                     <button class="format-btn" data-format="msq3" onclick="setFormat('msq3')">MSQ3</button>
-                    <button class="format-btn" data-format="j2k" onclick="setFormat('j2k')">J2K</button>
                   </div>
                   <div class="format-hint" id="formatHint">Lossless, larger file size</div>
                 </div>
@@ -1611,10 +1629,10 @@
             </div>
             <div class="panel-body">
               <div class="upload-slot upload-large" id="uploadSlotCombined" onclick="document.getElementById('fileInputCombined').click()">
-                <input type="file" id="fileInputCombined" accept="image/*,.msq3,.j2k,.jp2" onchange="handleCombinedUpload(this.files[0])">
+                <input type="file" id="fileInputCombined" accept="image/*,.msq3" onchange="handleCombinedUpload(this.files[0])">
                 <div class="upload-placeholder">
                   <span class="upload-icon">+</span>
-                  <span class="upload-label">Load Image, MSQ3, or J2K</span>
+                  <span class="upload-label">Load Image or MSQ3</span>
                 </div>
                 <button class="remove-btn" onclick="event.stopPropagation(); removeCombinedImage()">×</button>
                 <button class="zoom-btn" onclick="event.stopPropagation(); openZoomModal(this.parentElement, 'Combined Input')">⌕</button>
@@ -1775,7 +1793,7 @@
         slot.classList.remove('dragover');
         const file = e.dataTransfer.files[0];
         const name = file ? file.name.toLowerCase() : '';
-        if (file && (file.type.startsWith('image/') || name.endsWith('.msq3') || name.endsWith('.j2k') || name.endsWith('.jp2'))) {
+        if (file && (file.type.startsWith('image/') || name.endsWith('.msq3'))) {
           handler(file);
         }
       });
@@ -2353,219 +2371,6 @@
     };
 
     // ═══════════════════════════════════════════════════════════════════
-    // J2K FORMAT HANDLER (JPEG 2000)
-    // Per-channel compression using JPEG 2000
-    // ═══════════════════════════════════════════════════════════════════
-    const J2KFormat = {
-      MAGIC: 'J2K3',
-      VERSION: 1,
-
-      // Check if OpenJPEG library is loaded
-      isLibraryLoaded() {
-        return typeof OpenJPEG !== 'undefined';
-      },
-
-      // Encode 3 CFAs into J2K format with per-channel JPEG 2000 compression
-      async encode(cfaR, cfaG, cfaB, width, height, quality) {
-        // Since JPEG 2000 encoding requires external library (OpenJPEG.js),
-        // we'll use a similar approach to MSQ3 but with a different structure
-        // For now, we'll encode each channel as a grayscale image
-
-        // Convert quality (1-100) to JPEG 2000 compression ratio
-        // Higher quality = lower compression ratio
-        const compressionRatio = Math.max(1, Math.round((100 - quality) / 5) + 1);
-
-        // Create grayscale images for each channel
-        const canvasR = MSQ3Format.cfaToCanvas(cfaR, width, height);
-        const canvasG = MSQ3Format.cfaToCanvas(cfaG, width, height);
-        const canvasB = MSQ3Format.cfaToCanvas(cfaB, width, height);
-
-        // Get raw pixel data for each channel
-        const dataR = canvasR.getContext('2d').getImageData(0, 0, width, height);
-        const dataG = canvasG.getContext('2d').getImageData(0, 0, width, height);
-        const dataB = canvasB.getContext('2d').getImageData(0, 0, width, height);
-
-        // Extract just the grayscale values (R channel since R=G=B)
-        const grayR = new Uint8Array(width * height);
-        const grayG = new Uint8Array(width * height);
-        const grayB = new Uint8Array(width * height);
-
-        for (let i = 0; i < width * height; i++) {
-          grayR[i] = dataR.data[i * 4];
-          grayG[i] = dataG.data[i * 4];
-          grayB[i] = dataB.data[i * 4];
-        }
-
-        // If OpenJPEG is available, use it for true J2K encoding
-        if (this.isLibraryLoaded()) {
-          return await this.encodeWithOpenJPEG(grayR, grayG, grayB, width, height, compressionRatio);
-        }
-
-        // Fallback: Use a simple RLE + DEFLATE compression for demonstration
-        // This simulates the structure of J2K with per-channel compression
-        return await this.encodeFallback(grayR, grayG, grayB, width, height, quality);
-      },
-
-      // Fallback encoding without OpenJPEG (uses PNG compression internally)
-      async encodeFallback(grayR, grayG, grayB, width, height, quality) {
-        // We'll compress each channel as grayscale PNG (lossless per-channel)
-        // This demonstrates the concept even without true J2K support
-        const canvasR = this.grayToCanvas(grayR, width, height);
-        const canvasG = this.grayToCanvas(grayG, width, height);
-        const canvasB = this.grayToCanvas(grayB, width, height);
-
-        // Use PNG for each channel (no color space conversion, per-channel compression)
-        const [blobR, blobG, blobB] = await Promise.all([
-          new Promise(resolve => canvasR.toBlob(resolve, 'image/png')),
-          new Promise(resolve => canvasG.toBlob(resolve, 'image/png')),
-          new Promise(resolve => canvasB.toBlob(resolve, 'image/png'))
-        ]);
-
-        const [bufR, bufG, bufB] = await Promise.all([
-          blobR.arrayBuffer(),
-          blobG.arrayBuffer(),
-          blobB.arrayBuffer()
-        ]);
-
-        // Build the J2K3 file (our wrapper format for 3-channel J2K)
-        // Header: MAGIC(4) + VERSION(1) + WIDTH(4) + HEIGHT(4) + QUALITY(1) + FLAGS(1) = 15 bytes
-        const headerSize = 15;
-        const totalSize = headerSize + 4 + bufR.byteLength + 4 + bufG.byteLength + 4 + bufB.byteLength;
-
-        const buffer = new ArrayBuffer(totalSize);
-        const view = new DataView(buffer);
-        const uint8 = new Uint8Array(buffer);
-
-        let offset = 0;
-
-        // Magic bytes "J2K3"
-        uint8[offset++] = 74;  // J
-        uint8[offset++] = 50;  // 2
-        uint8[offset++] = 75;  // K
-        uint8[offset++] = 51;  // 3
-
-        // Version
-        uint8[offset++] = this.VERSION;
-
-        // Width (little-endian)
-        view.setUint32(offset, width, true);
-        offset += 4;
-
-        // Height (little-endian)
-        view.setUint32(offset, height, true);
-        offset += 4;
-
-        // Quality
-        uint8[offset++] = quality;
-
-        // Flags: 0 = fallback mode (PNG), 1 = true J2K
-        uint8[offset++] = 0;
-
-        // R channel
-        view.setUint32(offset, bufR.byteLength, true);
-        offset += 4;
-        uint8.set(new Uint8Array(bufR), offset);
-        offset += bufR.byteLength;
-
-        // G channel
-        view.setUint32(offset, bufG.byteLength, true);
-        offset += 4;
-        uint8.set(new Uint8Array(bufG), offset);
-        offset += bufG.byteLength;
-
-        // B channel
-        view.setUint32(offset, bufB.byteLength, true);
-        offset += 4;
-        uint8.set(new Uint8Array(bufB), offset);
-
-        return new Blob([buffer], { type: 'application/octet-stream' });
-      },
-
-      grayToCanvas(gray, width, height) {
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        const imgData = ctx.createImageData(width, height);
-
-        for (let i = 0; i < gray.length; i++) {
-          const idx = i * 4;
-          imgData.data[idx] = gray[i];
-          imgData.data[idx + 1] = gray[i];
-          imgData.data[idx + 2] = gray[i];
-          imgData.data[idx + 3] = 255;
-        }
-
-        ctx.putImageData(imgData, 0, 0);
-        return canvas;
-      },
-
-      // Decode J2K3 file into 3 CFAs
-      async decode(file) {
-        const buffer = await file.arrayBuffer();
-        const view = new DataView(buffer);
-        const uint8 = new Uint8Array(buffer);
-
-        let offset = 0;
-
-        // Verify magic bytes
-        const magic = String.fromCharCode(uint8[0], uint8[1], uint8[2], uint8[3]);
-        if (magic !== this.MAGIC) {
-          throw new Error('Invalid J2K file: bad magic bytes');
-        }
-        offset += 4;
-
-        // Version
-        const version = uint8[offset++];
-        if (version > this.VERSION) {
-          throw new Error(`Unsupported J2K version: ${version}`);
-        }
-
-        // Dimensions
-        const width = view.getUint32(offset, true);
-        offset += 4;
-        const height = view.getUint32(offset, true);
-        offset += 4;
-
-        // Quality
-        const quality = uint8[offset++];
-
-        // Flags
-        const flags = uint8[offset++];
-
-        // Extract channel blobs
-        const channels = [];
-        for (let i = 0; i < 3; i++) {
-          const size = view.getUint32(offset, true);
-          offset += 4;
-          const data = buffer.slice(offset, offset + size);
-          offset += size;
-          // Type depends on flags
-          const mimeType = flags === 0 ? 'image/png' : 'image/jp2';
-          channels.push(new Blob([data], { type: mimeType }));
-        }
-
-        // Decode each blob back to CFA
-        const cfas = await Promise.all(channels.map(blob => MSQ3Format.decodeChannelBlob(blob, width, height)));
-
-        return {
-          width,
-          height,
-          quality,
-          cfaR: cfas[0],
-          cfaG: cfas[1],
-          cfaB: cfas[2]
-        };
-      },
-
-      // Check if file is J2K format
-      isJ2KFile(file) {
-        const name = file.name.toLowerCase();
-        return name.endsWith('.j2k') || name.endsWith('.jp2');
-      }
-    };
-
-    // ═══════════════════════════════════════════════════════════════════
     // ZOOM MODAL CONTROLLER
     // ═══════════════════════════════════════════════════════════════════
     const ZoomController = {
@@ -2729,6 +2534,34 @@
     // ═══════════════════════════════════════════════════════════════════
     // MOSAIQUE TAB HANDLERS
     // ═══════════════════════════════════════════════════════════════════
+
+    // Handle batch upload of up to 3 images at once
+    async function handleBatchUpload(files) {
+      if (!files || files.length === 0) return;
+
+      // Take only the first 3 files
+      const filesToProcess = Array.from(files).slice(0, 3);
+
+      // Clear existing images first if uploading 3 new ones
+      if (filesToProcess.length === 3) {
+        [1, 2, 3].forEach(i => removeImage(i));
+      }
+
+      // Process each file sequentially to maintain order and check dimensions
+      for (let i = 0; i < filesToProcess.length; i++) {
+        const slot = i + 1;
+        await handleUpload(slot, filesToProcess[i]);
+
+        // If there was an error (dimension mismatch), stop processing
+        if (document.getElementById('errorBanner').classList.contains('visible')) {
+          break;
+        }
+      }
+
+      // Reset the file input so the same files can be selected again
+      document.getElementById('batchFileInput').value = '';
+    }
+
     async function handleUpload(slot, file) {
       if (!file) return;
 
@@ -2886,10 +2719,6 @@
         qualityControl.classList.add('visible');
         formatHint.textContent = 'Per-channel WebP compression';
         formatHint.className = 'format-hint msq3';
-      } else if (format === 'j2k') {
-        qualityControl.classList.add('visible');
-        formatHint.textContent = 'Per-channel JPEG 2000 (experimental)';
-        formatHint.className = 'format-hint j2k';
       }
 
       updateSizeEstimate();
@@ -2907,18 +2736,12 @@
         return;
       }
 
-      let blob;
       const { width, height } = state.images[0];
-
+      let blob;
       if (state.format === 'png') {
         blob = await FileHandler.exportToBlob(state.combinedCanvas, 'png', 100);
       } else if (state.format === 'msq3') {
         blob = await MSQ3Format.encode(
-          state.cfas[0], state.cfas[1], state.cfas[2],
-          width, height, state.quality
-        );
-      } else if (state.format === 'j2k') {
-        blob = await J2KFormat.encode(
           state.cfas[0], state.cfas[1], state.cfas[2],
           width, height, state.quality
         );
@@ -2952,12 +2775,6 @@
           width, height, state.quality
         );
         filename = 'minra-combined.msq3';
-      } else if (state.format === 'j2k') {
-        blob = await J2KFormat.encode(
-          state.cfas[0], state.cfas[1], state.cfas[2],
-          width, height, state.quality
-        );
-        filename = 'minra-combined.j2k';
       }
 
       FileHandler.downloadBlob(blob, filename);
@@ -2975,12 +2792,6 @@
         // Check if it's an MSQ3 file
         if (MSQ3Format.isMSQ3File(file)) {
           await handleMSQ3Upload(file);
-          return;
-        }
-
-        // Check if it's a J2K file
-        if (J2KFormat.isJ2KFile(file)) {
-          await handleJ2KUpload(file);
           return;
         }
 
@@ -3053,48 +2864,6 @@
 
       } catch (err) {
         showError('Failed to decode MSQ3: ' + err.message);
-      }
-    }
-
-    async function handleJ2KUpload(file) {
-      try {
-        const { width, height, quality, cfaR, cfaG, cfaB } = await J2KFormat.decode(file);
-
-        // Store CFAs directly - no extraction needed!
-        state.extractedCFAs = [cfaR, cfaG, cfaB];
-
-        // Create a combined image for display purposes
-        const combinedCanvas = ImageCombiner.combine(cfaR, cfaG, cfaB, width, height);
-        const ctx = combinedCanvas.getContext('2d');
-        state.combinedImage = ctx.getImageData(0, 0, width, height);
-
-        // Update upload slot UI
-        const slotEl = document.getElementById('uploadSlotCombined');
-        slotEl.classList.add('has-image');
-
-        const placeholder = slotEl.querySelector('.upload-placeholder');
-        if (placeholder) placeholder.style.display = 'none';
-
-        const existingImg = slotEl.querySelector('img');
-        if (existingImg) existingImg.remove();
-
-        const previewImg = document.createElement('img');
-        previewImg.src = combinedCanvas.toDataURL();
-        slotEl.appendChild(previewImg);
-
-        // Update dimension info with J2K indicator
-        const infoEl = document.getElementById('combinedDimensionReadout');
-        infoEl.innerHTML = `${width} × ${height} px <span style="color: var(--amber);">J2K @${quality}%</span>`;
-        infoEl.classList.add('visible');
-
-        // Display channel previews
-        displayExtractedChannels(width, height);
-
-        // Run demosaicing
-        runDemosaicing();
-
-      } catch (err) {
-        showError('Failed to decode J2K: ' + err.message);
       }
     }
 

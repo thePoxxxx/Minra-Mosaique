@@ -64,12 +64,11 @@ Odd rows:  G B G B G B ...
 |--------|-------------|-------------|----------|
 | PNG | Lossless | None | Archival, maximum quality |
 | MSQ3 | Per-channel WebP | None | Smaller files, adjustable quality |
-| J2K | Per-channel JPEG 2000 | None | Experimental, per-channel lossless (fallback) |
 
-**Why per-channel formats instead of JPEG?**
-JPEG uses chroma subsampling (4:2:0) which stores color at half resolution. When CFAs are stored in RGB channels and JPEG-compressed, the G and B channels get "smeared", causing color bleed during demosaicing. MSQ3 and J2K compress each channel separately as grayscale images, avoiding this issue entirely.
+**Why MSQ3 instead of JPEG?**
+JPEG uses chroma subsampling (4:2:0) which stores color at half resolution. When CFAs are stored in RGB channels and JPEG-compressed, the G and B channels get "smeared", causing color bleed during demosaicing. MSQ3 compresses each channel separately as grayscale WebP, avoiding this issue entirely.
 
-**Note on J2K:** True JPEG 2000 encoding requires an external library (OpenJPEG.js). The current implementation uses a fallback mode with per-channel PNG compression to demonstrate the concept. This can be upgraded to true J2K with OpenJPEG.js when needed.
+**Fully Offline:** Both PNG and MSQ3 use native browser APIs (Canvas.toBlob) - no external libraries or internet connection required.
 
 ### MSQ3 File Format
 
@@ -90,28 +89,6 @@ Data:
 ├── G channel data: WebP blob
 ├── B channel size: uint32 LE (4 bytes)
 └── B channel data: WebP blob
-```
-
-### J2K File Format (Experimental)
-
-Custom binary format for storing 3 CFA channels with per-channel compression (PNG fallback or JPEG 2000).
-
-```
-Header (15 bytes):
-├── Magic: "J2K3" (4 bytes)
-├── Version: uint8 (1 byte)
-├── Width: uint32 LE (4 bytes)
-├── Height: uint32 LE (4 bytes)
-├── Quality: uint8 (1 byte)
-└── Flags: uint8 (1 byte) - 0=PNG fallback, 1=true J2K
-
-Data:
-├── R channel size: uint32 LE (4 bytes)
-├── R channel data: PNG or JP2 blob
-├── G channel size: uint32 LE (4 bytes)
-├── G channel data: PNG or JP2 blob
-├── B channel size: uint32 LE (4 bytes)
-└── B channel data: PNG or JP2 blob
 ```
 
 ### Demosaicing Algorithms
@@ -149,11 +126,6 @@ MSQ3Format
 ├── encode(cfaR, cfaG, cfaB, w, h, q)   // 3 CFAs → MSQ3 blob
 ├── decode(file)                         // MSQ3 file → 3 CFAs
 └── isMSQ3File(file)                     // Check file extension
-
-J2KFormat
-├── encode(cfaR, cfaG, cfaB, w, h, q)   // 3 CFAs → J2K blob (PNG fallback)
-├── decode(file)                         // J2K file → 3 CFAs
-└── isJ2KFile(file)                      // Check file extension
 
 ZoomController
 ├── zoomIn() / zoomOut() / reset()      // Zoom controls
