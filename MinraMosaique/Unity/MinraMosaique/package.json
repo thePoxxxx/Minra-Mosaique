@@ -1,0 +1,32 @@
+{
+  "name": "com.minra.mosaique",
+  "version": "1.0.0",
+  "displayName": "Minra Mosaique",
+  "description": "Decode combined Bayer CFA images into 3 separate texture outputs using GPU-accelerated demosaicing. Supports PNG and MSQ3 formats with Bilinear and Malvar-He-Cutler algorithms.",
+  "unity": "2021.3",
+  "unityRelease": "0f1",
+  "documentationUrl": "https://github.com/minra/mosaique",
+  "keywords": [
+    "texture",
+    "demosaic",
+    "bayer",
+    "cfa",
+    "image-processing",
+    "shader-graph"
+  ],
+  "author": {
+    "name": "Minra",
+    "url": "https://minra.io"
+  },
+  "dependencies": {
+    "com.unity.shadergraph": "12.0.0",
+    "com.unity.render-pipelines.core": "12.0.0"
+  },
+  "samples": [
+    {
+      "displayName": "Demo Material",
+      "description": "Example material using the Minra Mosaique node",
+      "path": "Samples~/DemoMaterial"
+    }
+  ]
+}

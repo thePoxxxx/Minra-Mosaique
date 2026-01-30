@@ -1,0 +1,65 @@
+================================================================================
+                    MINRA MOSAIQUE FOR UNITY - QUICK INSTALL
+================================================================================
+
+REQUIREMENTS
+------------
+  - Unity 2021.3 or later
+  - URP or HDRP
+  - Shader Graph package
+
+
+INSTALLATION (Pick One)
+-----------------------
+
+  METHOD A: Package Manager (Recommended)
+
+    1. Window > Package Manager
+    2. Click [+] > "Add package from disk..."
+    3. Select: MinraMosaique/package.json
+    4. Done!
+
+
+  METHOD B: Edit manifest.json
+
+    1. Open [YourProject]/Packages/manifest.json
+    2. Add to dependencies:
+       "com.minra.mosaique": "file:C:/path/to/MinraMosaique/Unity/MinraMosaique"
+    3. Save and reopen Unity
+
+
+  METHOD C: Direct Copy
+
+    1. Copy this entire "MinraMosaique" folder
+    2. Paste into [YourProject]/Packages/
+    3. Reopen Unity
+
+
+VERIFY INSTALLATION
+-------------------
+  [ ] Package Manager shows "Minra Mosaique" v1.0.0
+  [ ] Shader Graph: Right-click > search "Minra" > node appears
+  [ ] Menu: Window > Minra > Mosaique Bake Window opens
+
+
+QUICK TEST
+----------
+  1. Create new Shader Graph (URP/HDRP Lit)
+  2. Right-click > Create Node > search "Minra Mosaique"
+  3. Add a Texture2D property, connect to node
+  4. Connect "Image 1" output to Base Color
+  5. Save and create material
+
+
+TROUBLESHOOTING
+---------------
+  Node not appearing?
+    - Restart Unity
+    - Check Console for errors
+
+  "Texture not readable" when baking?
+    - Select texture > Inspector > Enable "Read/Write" > Apply
+
+  See full guide: ../INSTALL.txt
+
+================================================================================

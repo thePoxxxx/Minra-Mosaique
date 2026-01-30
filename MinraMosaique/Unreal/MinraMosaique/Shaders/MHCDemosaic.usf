@@ -1,0 +1,158 @@
+// Minra Mosaique - Malvar-He-Cutler Demosaicing Shader for Unreal Engine
+// High-quality 5x5 gradient-corrected interpolation
+// Better edge preservation at higher GPU cost
+
+// Bayer RGGB Pattern:
+// Even rows: R G R G R G ...
+// Odd rows:  G B G B G B ...
+
+// Sample CFA value with mirror reflection boundary handling
+float SampleCFA_MHC(Texture2D Tex, SamplerState Samp, int2 Pos, int2 TexSize, int Channel)
+{
+    // Mirror reflection at boundaries
+    if (Pos.x < 0) Pos.x = -Pos.x;
+    if (Pos.y < 0) Pos.y = -Pos.y;
+    if (Pos.x >= TexSize.x) Pos.x = 2 * TexSize.x - Pos.x - 2;
+    if (Pos.y >= TexSize.y) Pos.y = 2 * TexSize.y - Pos.y - 2;
+
+    // Final clamp for safety
+    Pos = clamp(Pos, int2(0, 0), TexSize - int2(1, 1));
+
+    float2 UV = (float2(Pos) + 0.5) / float2(TexSize);
+    float4 Color = Tex.SampleLevel(Samp, UV, 0);
+
+    if (Channel == 0) return Color.r;
+    if (Channel == 1) return Color.g;
+    return Color.b;
+}
+
+// Malvar-He-Cutler demosaicing for a single channel
+// Uses 5x5 gradient-corrected kernels for high-quality interpolation
+float3 MHCDemosaic(Texture2D Tex, SamplerState Samp, int2 Pos, int2 TexSize, int Channel)
+{
+    bool EvenRow = (Pos.y & 1) == 0;
+    bool EvenCol = (Pos.x & 1) == 0;
+
+    float R, G, B;
+
+    // Shorthand for common positions
+    float C = SampleCFA_MHC(Tex, Samp, Pos, TexSize, Channel);  // Center
+
+    // Cross neighbors
+    float N = SampleCFA_MHC(Tex, Samp, Pos + int2(0, -1), TexSize, Channel);  // North
+    float S = SampleCFA_MHC(Tex, Samp, Pos + int2(0,  1), TexSize, Channel);  // South
+    float W = SampleCFA_MHC(Tex, Samp, Pos + int2(-1, 0), TexSize, Channel);  // West
+    float E = SampleCFA_MHC(Tex, Samp, Pos + int2( 1, 0), TexSize, Channel);  // East
+
+    // Diagonal neighbors
+    float NW = SampleCFA_MHC(Tex, Samp, Pos + int2(-1, -1), TexSize, Channel);
+    float NE = SampleCFA_MHC(Tex, Samp, Pos + int2( 1, -1), TexSize, Channel);
+    float SW = SampleCFA_MHC(Tex, Samp, Pos + int2(-1,  1), TexSize, Channel);
+    float SE = SampleCFA_MHC(Tex, Samp, Pos + int2( 1,  1), TexSize, Channel);
+
+    // Extended cross (2 pixels away)
+    float N2 = SampleCFA_MHC(Tex, Samp, Pos + int2(0, -2), TexSize, Channel);
+    float S2 = SampleCFA_MHC(Tex, Samp, Pos + int2(0,  2), TexSize, Channel);
+    float W2 = SampleCFA_MHC(Tex, Samp, Pos + int2(-2, 0), TexSize, Channel);
+    float E2 = SampleCFA_MHC(Tex, Samp, Pos + int2( 2, 0), TexSize, Channel);
+
+    // Extended diagonal (for some kernels)
+    float NW2_H = SampleCFA_MHC(Tex, Samp, Pos + int2(-2, -1), TexSize, Channel);  // 2 west of north
+    float NE2_H = SampleCFA_MHC(Tex, Samp, Pos + int2( 2, -1), TexSize, Channel);  // 2 east of north
+    float SW2_H = SampleCFA_MHC(Tex, Samp, Pos + int2(-2,  1), TexSize, Channel);  // 2 west of south
+    float SE2_H = SampleCFA_MHC(Tex, Samp, Pos + int2( 2,  1), TexSize, Channel);  // 2 east of south
+
+    float NW2_V = SampleCFA_MHC(Tex, Samp, Pos + int2(-1, -2), TexSize, Channel);  // 2 north of west
+    float NE2_V = SampleCFA_MHC(Tex, Samp, Pos + int2( 1, -2), TexSize, Channel);  // 2 north of east
+    float SW2_V = SampleCFA_MHC(Tex, Samp, Pos + int2(-1,  2), TexSize, Channel);  // 2 south of west
+    float SE2_V = SampleCFA_MHC(Tex, Samp, Pos + int2( 1,  2), TexSize, Channel);  // 2 south of east
+
+    if (EvenRow && EvenCol)
+    {
+        // Position is R (native red)
+        R = C;
+
+        // G at R location: kernel with gradient correction
+        G = (4.0 * C + 2.0 * (N + S + W + E) - (N2 + S2 + W2 + E2)) / 8.0;
+
+        // B at R location: diagonal average with gradient correction
+        B = (6.0 * C + 2.0 * (NW + NE + SW + SE) - 1.5 * (N2 + S2 + W2 + E2)) / 8.0;
+    }
+    else if (EvenRow && !EvenCol)
+    {
+        // Position is G on R row
+        G = C;
+
+        // R at G (on R row): horizontal neighbors with gradient correction
+        R = (5.0 * C + 4.0 * (W + E) - (N + S + W2 + E2 + NW2_H + NE2_H + SW2_H + SE2_H) * 0.5) / 8.0;
+
+        // B at G (on R row): vertical neighbors with gradient correction
+        B = (5.0 * C + 4.0 * (N + S) - (W + E + N2 + S2 + NW2_V + NE2_V + SW2_V + SE2_V) * 0.5) / 8.0;
+    }
+    else if (!EvenRow && EvenCol)
+    {
+        // Position is G on B row
+        G = C;
+
+        // R at G (on B row): vertical neighbors with gradient correction
+        R = (5.0 * C + 4.0 * (N + S) - (W + E + N2 + S2 + NW2_V + NE2_V + SW2_V + SE2_V) * 0.5) / 8.0;
+
+        // B at G (on B row): horizontal neighbors with gradient correction
+        B = (5.0 * C + 4.0 * (W + E) - (N + S + W2 + E2 + NW2_H + NE2_H + SW2_H + SE2_H) * 0.5) / 8.0;
+    }
+    else
+    {
+        // Position is B (native blue)
+        B = C;
+
+        // G at B location: same as G at R location
+        G = (4.0 * C + 2.0 * (N + S + W + E) - (N2 + S2 + W2 + E2)) / 8.0;
+
+        // R at B location: same pattern as B at R location
+        R = (6.0 * C + 2.0 * (NW + NE + SW + SE) - 1.5 * (N2 + S2 + W2 + E2)) / 8.0;
+    }
+
+    // Clamp to valid range
+    return saturate(float3(R, G, B));
+}
+
+// MHC demosaicing using UV coordinates
+float3 MHCDemosaicUV(Texture2D Tex, SamplerState Samp, float2 UV, float2 TexelSize, int Channel)
+{
+    int2 TexSize = int2(1.0 / TexelSize);
+    int2 Pos = int2(UV * TexSize);
+
+    return MHCDemosaic(Tex, Samp, Pos, TexSize, Channel);
+}
+
+// Process all three channels and output three demosaiced images
+void MHCDemosaicAll(
+    Texture2D Tex,
+    SamplerState Samp,
+    int2 Pos,
+    int2 TexSize,
+    out float3 Image1,
+    out float3 Image2,
+    out float3 Image3)
+{
+    Image1 = MHCDemosaic(Tex, Samp, Pos, TexSize, 0); // Red channel -> Image 1
+    Image2 = MHCDemosaic(Tex, Samp, Pos, TexSize, 1); // Green channel -> Image 2
+    Image3 = MHCDemosaic(Tex, Samp, Pos, TexSize, 2); // Blue channel -> Image 3
+}
+
+// Material function entry point
+// Use this in Custom node or as include
+void MinraDemosaic_MHC(
+    Texture2D CombinedTexture,
+    SamplerState TextureSampler,
+    float2 UV,
+    float2 TextureSize,
+    out float3 OutputImage1,
+    out float3 OutputImage2,
+    out float3 OutputImage3)
+{
+    int2 TexSize = int2(TextureSize);
+    int2 Pos = int2(UV * TextureSize);
+
+    MHCDemosaicAll(CombinedTexture, TextureSampler, Pos, TexSize, OutputImage1, OutputImage2, OutputImage3);
+}

@@ -1,0 +1,17 @@
+{
+    "name": "MinraMosaique",
+    "rootNamespace": "Minra.Mosaique",
+    "references": [
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.ShaderGraph.Editor"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,0 +1,122 @@
+// Minra Mosaique - Bilinear Demosaicing Shader for Unreal Engine
+// Fast 3x3 interpolation for Bayer RGGB pattern
+// Good quality for most use cases with lower GPU cost
+
+// Bayer RGGB Pattern:
+// Even rows: R G R G R G ...
+// Odd rows:  G B G B G B ...
+//
+// Position detection:
+// (0,0)=R, (1,0)=G, (0,1)=G, (1,1)=B
+// evenRow = (y & 1) == 0
+// evenCol = (x & 1) == 0
+
+// Sample CFA value with clamp-to-edge boundary handling
+float SampleCFA_Bilinear(Texture2D Tex, SamplerState Samp, int2 Pos, int2 TexSize, int Channel)
+{
+    // Clamp to valid texture coordinates
+    Pos = clamp(Pos, int2(0, 0), TexSize - int2(1, 1));
+    float2 UV = (float2(Pos) + 0.5) / float2(TexSize);
+    float4 Color = Tex.SampleLevel(Samp, UV, 0);
+
+    if (Channel == 0) return Color.r;
+    if (Channel == 1) return Color.g;
+    return Color.b;
+}
+
+// Bilinear demosaicing for a single channel
+// Returns RGB color reconstructed from the CFA pattern
+float3 BilinearDemosaic(Texture2D Tex, SamplerState Samp, int2 Pos, int2 TexSize, int Channel)
+{
+    bool EvenRow = (Pos.y & 1) == 0;
+    bool EvenCol = (Pos.x & 1) == 0;
+
+    float R, G, B;
+
+    // Sample the center pixel
+    float Center = SampleCFA_Bilinear(Tex, Samp, Pos, TexSize, Channel);
+
+    // Sample neighbors
+    float Top    = SampleCFA_Bilinear(Tex, Samp, Pos + int2(0, -1), TexSize, Channel);
+    float Bottom = SampleCFA_Bilinear(Tex, Samp, Pos + int2(0,  1), TexSize, Channel);
+    float Left   = SampleCFA_Bilinear(Tex, Samp, Pos + int2(-1, 0), TexSize, Channel);
+    float Right  = SampleCFA_Bilinear(Tex, Samp, Pos + int2( 1, 0), TexSize, Channel);
+
+    float TopLeft     = SampleCFA_Bilinear(Tex, Samp, Pos + int2(-1, -1), TexSize, Channel);
+    float TopRight    = SampleCFA_Bilinear(Tex, Samp, Pos + int2( 1, -1), TexSize, Channel);
+    float BottomLeft  = SampleCFA_Bilinear(Tex, Samp, Pos + int2(-1,  1), TexSize, Channel);
+    float BottomRight = SampleCFA_Bilinear(Tex, Samp, Pos + int2( 1,  1), TexSize, Channel);
+
+    if (EvenRow && EvenCol)
+    {
+        // Position is R (native red)
+        R = Center;
+        G = (Top + Bottom + Left + Right) * 0.25;
+        B = (TopLeft + TopRight + BottomLeft + BottomRight) * 0.25;
+    }
+    else if (EvenRow && !EvenCol)
+    {
+        // Position is G on R row (green on red row)
+        R = (Left + Right) * 0.5;
+        G = Center;
+        B = (Top + Bottom) * 0.5;
+    }
+    else if (!EvenRow && EvenCol)
+    {
+        // Position is G on B row (green on blue row)
+        R = (Top + Bottom) * 0.5;
+        G = Center;
+        B = (Left + Right) * 0.5;
+    }
+    else
+    {
+        // Position is B (native blue)
+        R = (TopLeft + TopRight + BottomLeft + BottomRight) * 0.25;
+        G = (Top + Bottom + Left + Right) * 0.25;
+        B = Center;
+    }
+
+    return float3(R, G, B);
+}
+
+// Bilinear demosaicing using UV coordinates
+float3 BilinearDemosaicUV(Texture2D Tex, SamplerState Samp, float2 UV, float2 TexelSize, int Channel)
+{
+    // Convert UV to pixel coordinates
+    int2 TexSize = int2(1.0 / TexelSize);
+    int2 Pos = int2(UV * TexSize);
+
+    return BilinearDemosaic(Tex, Samp, Pos, TexSize, Channel);
+}
+
+// Process all three channels and output three demosaiced images
+void BilinearDemosaicAll(
+    Texture2D Tex,
+    SamplerState Samp,
+    int2 Pos,
+    int2 TexSize,
+    out float3 Image1,
+    out float3 Image2,
+    out float3 Image3)
+{
+    Image1 = BilinearDemosaic(Tex, Samp, Pos, TexSize, 0); // Red channel -> Image 1
+    Image2 = BilinearDemosaic(Tex, Samp, Pos, TexSize, 1); // Green channel -> Image 2
+    Image3 = BilinearDemosaic(Tex, Samp, Pos, TexSize, 2); // Blue channel -> Image 3
+}
+
+// Material function entry point
+// Use this in Custom node or as include
+void MinraDemosaic_Bilinear(
+    Texture2D CombinedTexture,
+    SamplerState TextureSampler,
+    float2 UV,
+    float2 TextureSize,
+    out float3 OutputImage1,
+    out float3 OutputImage2,
+    out float3 OutputImage3)
+{
+    int2 TexSize = int2(TextureSize);
+    int2 Pos = int2(UV * TextureSize);
+
+    BilinearDemosaicAll(CombinedTexture, TextureSampler, Pos, TexSize, OutputImage1, OutputImage2, OutputImage3);
+}

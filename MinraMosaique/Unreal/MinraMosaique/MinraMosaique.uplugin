@@ -1,0 +1,29 @@
+{
+    "FileVersion": 3,
+    "Version": 1,
+    "VersionName": "1.0",
+    "FriendlyName": "Minra Mosaique",
+    "Description": "Decode combined Bayer CFA images into 3 separate texture outputs using GPU-accelerated demosaicing. Supports PNG and MSQ3 formats with Bilinear and Malvar-He-Cutler algorithms.",
+    "Category": "Textures",
+    "CreatedBy": "Minra",
+    "CreatedByURL": "https://minra.io",
+    "DocsURL": "https://github.com/minra/mosaique",
+    "MarketplaceURL": "",
+    "SupportURL": "https://github.com/minra/mosaique/issues",
+    "CanContainContent": true,
+    "IsBetaVersion": false,
+    "IsExperimentalVersion": false,
+    "Installed": false,
+    "Modules": [
+        {
+            "Name": "MinraMosaique",
+            "Type": "Runtime",
+            "LoadingPhase": "Default"
+        },
+        {
+            "Name": "MinraMosaiqueEditor",
+            "Type": "Editor",
+            "LoadingPhase": "Default"
+        }
+    ]
+}

@@ -1,0 +1,372 @@
+================================================================================
+                         MINRA MOSAIQUE - INSTALLATION GUIDE
+================================================================================
+
+GPU-accelerated Bayer demosaicing for Unity Shader Graph and Unreal Material Editor.
+Decode combined CFA images into 3 separate texture outputs.
+
+================================================================================
+                              TABLE OF CONTENTS
+================================================================================
+
+  1. Requirements
+  2. Unity Installation
+  3. Unreal Installation
+  4. Verifying Installation
+  5. Quick Start
+  6. Troubleshooting
+
+================================================================================
+                              1. REQUIREMENTS
+================================================================================
+
+UNITY
+-----
+  - Unity 2021.3 or later
+  - Universal Render Pipeline (URP) or High Definition Render Pipeline (HDRP)
+  - Shader Graph package installed
+
+UNREAL ENGINE
+-------------
+  - Unreal Engine 5.0 or later
+  - Visual Studio 2019/2022 (for source builds)
+
+================================================================================
+                           2. UNITY INSTALLATION
+================================================================================
+
+OPTION A: Package Manager (Recommended)
+---------------------------------------
+
+  1. Open your Unity project
+
+  2. Open Package Manager
+     - Go to: Window > Package Manager
+
+  3. Add package from disk
+     - Click the [+] button in the top-left corner
+     - Select "Add package from disk..."
+
+  4. Navigate to the package.json file
+     - Browse to: MinraMosaique/Unity/MinraMosaique/package.json
+     - Click "Open"
+
+  5. Wait for import
+     - Unity will import the package
+     - You should see "Minra Mosaique" in the Package Manager list
+
+
+OPTION B: Manual manifest.json Edit
+-----------------------------------
+
+  1. Close Unity (recommended)
+
+  2. Open your project's manifest file
+     - Location: [YourProject]/Packages/manifest.json
+
+  3. Add the package dependency
+     - In the "dependencies" section, add:
+
+       "com.minra.mosaique": "file:C:/path/to/MinraMosaique/Unity/MinraMosaique"
+
+     - Replace the path with your actual path
+     - Use forward slashes (/) even on Windows
+
+  4. Save and reopen Unity
+     - The package will be imported automatically
+
+
+OPTION C: Copy to Packages Folder
+---------------------------------
+
+  1. Copy the entire folder
+     - Source: MinraMosaique/Unity/MinraMosaique
+     - Destination: [YourProject]/Packages/MinraMosaique
+
+  2. Open Unity
+     - The package will be detected automatically
+
+
+================================================================================
+                          3. UNREAL INSTALLATION
+================================================================================
+
+STEP 1: Locate Your Project's Plugins Folder
+---------------------------------------------
+
+  Your Unreal project folder structure:
+
+    YourProject/
+    ├── Config/
+    ├── Content/
+    ├── Plugins/          <-- Install here (create if missing)
+    ├── Source/
+    └── YourProject.uproject
+
+
+STEP 2: Create Plugins Folder (if needed)
+-----------------------------------------
+
+  If your project doesn't have a Plugins folder:
+
+  1. Navigate to your project's root folder
+  2. Create a new folder named "Plugins"
+
+
+STEP 3: Copy the Plugin
+-----------------------
+
+  1. Copy the entire MinraMosaique folder
+     - Source: MinraMosaique/Unreal/MinraMosaique
+     - Destination: [YourProject]/Plugins/MinraMosaique
+
+  Your project should now look like:
+
+    YourProject/
+    └── Plugins/
+        └── MinraMosaique/
+            ├── MinraMosaique.uplugin
+            ├── Shaders/
+            ├── Source/
+            └── Content/
+
+
+STEP 4: Rebuild the Project
+---------------------------
+
+  FOR BLUEPRINT-ONLY PROJECTS:
+
+    1. Open your .uproject file with Unreal Editor
+    2. When prompted to rebuild, click "Yes"
+    3. Wait for compilation to complete
+
+  FOR C++ PROJECTS:
+
+    1. Right-click your .uproject file
+    2. Select "Generate Visual Studio project files"
+    3. Open the .sln file in Visual Studio
+    4. Build the solution (F7 or Build > Build Solution)
+    5. Launch from Visual Studio or open .uproject
+
+
+STEP 5: Enable the Plugin (if needed)
+-------------------------------------
+
+  1. In Unreal Editor, go to: Edit > Plugins
+  2. Search for "Minra Mosaique"
+  3. Ensure the checkbox is enabled
+  4. Restart the editor if prompted
+
+
+================================================================================
+                         4. VERIFYING INSTALLATION
+================================================================================
+
+UNITY VERIFICATION
+------------------
+
+  Check 1: Package Manager
+    - Window > Package Manager
+    - "Minra Mosaique" should appear in the list
+    - Version should show "1.0.0"
+
+  Check 2: Shader Graph Node
+    - Create or open any Shader Graph
+    - Right-click in the graph
+    - Search for "Minra"
+    - "Minra Mosaique" node should appear under "Minra" category
+
+  Check 3: Create Asset Menu
+    - Right-click in Project window
+    - Go to: Create > Minra
+    - "Demosaic Texture" option should be available
+
+  Check 4: Bake Window
+    - Go to: Window > Minra > Mosaique Bake Window
+    - The bake utility window should open
+
+
+UNREAL VERIFICATION
+-------------------
+
+  Check 1: Plugin List
+    - Edit > Plugins
+    - Search for "Minra"
+    - Plugin should show as enabled
+
+  Check 2: Material Expression
+    - Open any Material
+    - Right-click in the graph
+    - Search for "Minra" or "Demosaic"
+    - "Minra Mosaique" expression should appear
+
+  Check 3: Asset Import
+    - Drag a .msq3 file into Content Browser
+    - Should import as MSQ3 Asset
+
+  Check 4: Console Log
+    - Open Output Log (Window > Developer Tools > Output Log)
+    - You should see: "Minra Mosaique: Runtime module loaded."
+
+
+================================================================================
+                              5. QUICK START
+================================================================================
+
+UNITY QUICK START
+-----------------
+
+  Creating a Demosaic Material:
+
+  1. Create a new Shader Graph
+     - Right-click in Project > Create > Shader Graph > URP > Lit Shader Graph
+
+  2. Open the Shader Graph
+
+  3. Add the Minra Mosaique node
+     - Right-click > Create Node
+     - Search "Minra Mosaique"
+     - Click to add
+
+  4. Create a Texture2D property
+     - In Blackboard, click [+] > Texture2D
+     - Name it "CombinedTexture"
+     - Drag it into the graph
+
+  5. Connect the nodes
+     - CombinedTexture output -> Minra Mosaique "Combined Texture" input
+     - Minra Mosaique "Image 1" output -> Fragment "Base Color" input
+
+  6. Save and create material
+     - Save the Shader Graph
+     - Right-click > Create > Material
+     - Assign your combined CFA texture
+
+
+UNREAL QUICK START
+------------------
+
+  Creating a Demosaic Material:
+
+  1. Create a new Material
+     - Right-click in Content Browser > Material
+
+  2. Open the Material Editor
+
+  3. Add a Texture Sample node
+     - Right-click > search "Texture Sample"
+     - Assign your combined CFA texture
+
+  4. Add the Minra Mosaique node
+     - Right-click > search "Minra Mosaique"
+     - Click to add
+
+  5. Connect the nodes
+     - Texture Sample output -> Minra Mosaique "Combined Texture" input
+     - Minra Mosaique "Image 1" output -> Material "Base Color" input
+
+  6. Save and apply
+     - Click "Apply" and "Save"
+     - Create a Material Instance if needed
+
+
+================================================================================
+                            6. TROUBLESHOOTING
+================================================================================
+
+UNITY ISSUES
+------------
+
+  Problem: "Assembly 'MinraMosaique' not found"
+  Solution:
+    - Ensure the package is in Packages/ not Assets/
+    - Check that package.json exists and is valid
+    - Try reimporting: right-click package > Reimport
+
+  Problem: Shader Graph node not appearing
+  Solution:
+    - Ensure you have Shader Graph package installed
+    - Check console for compilation errors
+    - Restart Unity Editor
+
+  Problem: "Texture is not readable" error when baking
+  Solution:
+    - Select your texture in Project window
+    - In Inspector, enable "Read/Write"
+    - Click "Apply"
+
+  Problem: MSQ3 files not importing
+  Solution:
+    - Check file extension is exactly ".msq3" (lowercase)
+    - Verify file is not corrupted (should start with "MSQ3" bytes)
+    - Note: Full WebP decoding requires external library
+
+
+UNREAL ISSUES
+-------------
+
+  Problem: Plugin not appearing in Plugins menu
+  Solution:
+    - Verify folder structure: Plugins/MinraMosaique/MinraMosaique.uplugin
+    - Check that .uplugin file exists and is valid JSON
+    - Regenerate project files and rebuild
+
+  Problem: "Module could not be loaded" error
+  Solution:
+    - For C++ projects: Rebuild the entire solution
+    - Check Output Log for specific compilation errors
+    - Ensure Visual Studio 2019/2022 is installed
+
+  Problem: Material expression not found
+  Solution:
+    - Verify plugin is enabled in Edit > Plugins
+    - Restart editor after enabling
+    - Check that MinraMosaiqueEditor module loaded (see Output Log)
+
+  Problem: Compile errors in plugin source
+  Solution:
+    - Ensure Unreal Engine 5.0 or later
+    - Check that all required modules are available
+    - Report issue with full error log
+
+
+COMMON ISSUES (BOTH ENGINES)
+----------------------------
+
+  Problem: Demosaiced output looks wrong/blocky
+  Solution:
+    - Ensure input texture contains valid CFA data
+    - Check that texture is not compressed with lossy format
+    - Use PNG format for best results
+
+  Problem: Magenta checkerboard output
+  Solution:
+    - This is the error fallback texture
+    - Check that input texture is assigned
+    - Verify texture dimensions are valid (> 0)
+    - Check console/log for specific error message
+
+  Problem: MSQ3 WebP channels not decoding
+  Solution:
+    - Unity/Unreal don't natively support WebP
+    - Use PNG workflow for guaranteed compatibility
+    - Or integrate a WebP decoding library
+
+
+================================================================================
+                              SUPPORT & FEEDBACK
+================================================================================
+
+  Documentation:    MinraMosaique/README.md
+  Algorithm Docs:   MinraMosaique/Shared/Documentation/ALGORITHMS.md
+
+  For issues and feature requests, please include:
+    - Engine and version (Unity 2022.3, UE 5.3, etc.)
+    - Operating system
+    - Steps to reproduce
+    - Console/log output
+    - Screenshots if applicable
+
+================================================================================
+                          Thank you for using Minra Mosaique!
+================================================================================

@@ -1,0 +1,81 @@
+================================================================================
+                   MINRA MOSAIQUE FOR UNREAL - QUICK INSTALL
+================================================================================
+
+REQUIREMENTS
+------------
+  - Unreal Engine 5.0 or later
+  - Visual Studio 2019/2022 (for C++ projects)
+
+
+INSTALLATION
+------------
+
+  STEP 1: Copy Plugin
+
+    Copy this folder:     MinraMosaique/
+    To your project:      [YourProject]/Plugins/MinraMosaique/
+
+    Result:
+      YourProject/
+      └── Plugins/
+          └── MinraMosaique/
+              ├── MinraMosaique.uplugin
+              ├── Shaders/
+              └── Source/
+
+
+  STEP 2: Build
+
+    Blueprint Project:
+      - Open .uproject file
+      - Click "Yes" when prompted to rebuild
+
+    C++ Project:
+      - Right-click .uproject > "Generate Visual Studio project files"
+      - Open .sln > Build Solution (F7)
+
+
+  STEP 3: Enable (if needed)
+
+    - Edit > Plugins
+    - Search "Minra"
+    - Enable checkbox
+    - Restart if prompted
+
+
+VERIFY INSTALLATION
+-------------------
+  [ ] Edit > Plugins shows "Minra Mosaique" enabled
+  [ ] Material Editor: Right-click > search "Minra" > node appears
+  [ ] Output Log shows: "Minra Mosaique: Runtime module loaded."
+
+
+QUICK TEST
+----------
+  1. Create new Material
+  2. Right-click > search "Minra Mosaique" > add node
+  3. Add Texture Sample node with your combined texture
+  4. Connect Texture Sample > Minra Mosaique "Combined Texture"
+  5. Connect "Image 1" > Base Color
+  6. Apply and Save
+
+
+TROUBLESHOOTING
+---------------
+  Plugin not appearing?
+    - Check folder structure matches above
+    - Regenerate project files
+    - Rebuild solution
+
+  Module load error?
+    - Full rebuild required
+    - Check Output Log for details
+
+  Material node not found?
+    - Verify plugin is enabled
+    - Restart editor
+
+  See full guide: ../INSTALL.txt
+
+================================================================================
